@@ -1,0 +1,272 @@
+
+> adp-frontend@0.1.0 dev
+> next dev --experimental-https --hostname local.adpgauto.com
+
+⚠ Self-signed certificates are currently an experimental feature, use with caution.
+  Attempting to generate self signed certificate. This may prompt for your password
+  CA Root certificate created in /Users/karan/Library/Application Support/mkcert
+  Certificates created in /Users/karan/Downloads/ADPG-frontend-main/certificates
+▲ Next.js 16.1.0 (Turbopack)
+- Local:         https://local.adpgauto.com:3000
+- Network:       https://local.adpgauto.com:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 732ms
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+ GET /login 200 in 541ms (compile: 90ms, proxy.ts: 49ms, render: 401ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 15ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 401 in 183ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 401 in 189ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /login 200 in 122ms (compile: 1800µs, proxy.ts: 1563µs, render: 119ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 2ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 401 in 57ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 401 in 59ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+ GET /login 200 in 329ms (compile: 1844µs, proxy.ts: 4ms, render: 323ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 4ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 257ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 268ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /buyer/dashboard 200 in 244ms (compile: 226ms, proxy.ts: 7ms, render: 10ms)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+ GET /buyer/dashboard 200 in 208ms (compile: 944µs, proxy.ts: 2ms, render: 205ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 2ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 178ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 182ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /buyer/orders 200 in 148ms (compile: 135ms, proxy.ts: 6ms, render: 6ms)
+ GET /buyer/dashboard 200 in 33ms (compile: 4ms, proxy.ts: 5ms, render: 24ms)
+FETCHING URL: https://qa-api.adpgauto.com/chat/api/negotiations?userId=697494248b1c75dd63759ffd&size=10
+ GET /my-negotiations 200 in 377ms (compile: 155ms, proxy.ts: 6ms, render: 216ms)
+ │ GET https://qa-api.adpgauto.com/chat/api/negotiations?userId=697494248b1c75dd63759ffd&size=10 200 in 203ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET / 200 in 142ms (compile: 27ms, proxy.ts: 7ms, render: 109ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 8ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 100ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 600ms (compile: 31ms, proxy.ts: 5ms, render: 564ms)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 240ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 185ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 4ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 66ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /quote-builder 200 in 146ms (compile: 133ms, proxy.ts: 6ms, render: 7ms)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100
+Error: Route "/my-negotiations/[conversationId]" used `searchParams.seller`. `searchParams` is a Promise and must be unwrapped with `await` or `React.use()` before accessing its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at MyConversation (app/my-negotiations/[conversationId]/page.tsx:52:32)
+  50 |
+  51 |     const vehicle = resp.data?.vehicle;
+> 52 |     const sellerQuery = typeof searchParams?.seller === "string" ? decodeURIComponent(searchParams.seller) : "";
+     |                                ^
+  53 |     const sellerId = conversationId.split("_")[1] ?? "";
+  54 |     return (
+  55 |         <main className="container mx-auto px-4 py-8 max-w-6xl">
+ GET /my-negotiations/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a 200 in 645ms (compile: 354ms, proxy.ts: 5ms, render: 286ms)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 185ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100 200 in 221ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /quote-builder 200 in 28ms (compile: 6ms, proxy.ts: 6ms, render: 16ms)
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /my-cart 200 in 354ms (compile: 143ms, proxy.ts: 6ms, render: 205ms)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 192ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /quote-builder 200 in 23ms (compile: 3ms, proxy.ts: 6ms, render: 13ms)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100
+Error: Route "/my-negotiations/[conversationId]" used `searchParams.seller`. `searchParams` is a Promise and must be unwrapped with `await` or `React.use()` before accessing its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at MyConversation (app/my-negotiations/[conversationId]/page.tsx:52:32)
+  50 |
+  51 |     const vehicle = resp.data?.vehicle;
+> 52 |     const sellerQuery = typeof searchParams?.seller === "string" ? decodeURIComponent(searchParams.seller) : "";
+     |                                ^
+  53 |     const sellerId = conversationId.split("_")[1] ?? "";
+  54 |     return (
+  55 |         <main className="container mx-auto px-4 py-8 max-w-6xl">
+ GET /my-negotiations/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a 200 in 273ms (compile: 15ms, proxy.ts: 5ms, render: 254ms)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 177ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100 200 in 231ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100
+Error: Route "/my-negotiations/[conversationId]" used `searchParams.seller`. `searchParams` is a Promise and must be unwrapped with `await` or `React.use()` before accessing its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at MyConversation (app/my-negotiations/[conversationId]/page.tsx:52:32)
+  50 |
+  51 |     const vehicle = resp.data?.vehicle;
+> 52 |     const sellerQuery = typeof searchParams?.seller === "string" ? decodeURIComponent(searchParams.seller) : "";
+     |                                ^
+  53 |     const sellerId = conversationId.split("_")[1] ?? "";
+  54 |     return (
+  55 |         <main className="container mx-auto px-4 py-8 max-w-6xl">
+ GET /my-negotiations/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a 200 in 716ms (compile: 8ms, proxy.ts: 6ms, render: 702ms)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 596ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100 200 in 661ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/chat/api/negotiations?userId=697494248b1c75dd63759ffd&size=10
+ GET /my-negotiations 200 in 259ms (compile: 5ms, proxy.ts: 6ms, render: 249ms)
+ │ GET https://qa-api.adpgauto.com/chat/api/negotiations?userId=697494248b1c75dd63759ffd&size=10 200 in 225ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET / 200 in 171ms (compile: 6ms, proxy.ts: 6ms, render: 159ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 15ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 147ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /quote-builder 200 in 23ms (compile: 3ms, proxy.ts: 5ms, render: 15ms)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100
+Error: Route "/my-negotiations/[conversationId]" used `searchParams.seller`. `searchParams` is a Promise and must be unwrapped with `await` or `React.use()` before accessing its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at MyConversation (app/my-negotiations/[conversationId]/page.tsx:52:32)
+  50 |
+  51 |     const vehicle = resp.data?.vehicle;
+> 52 |     const sellerQuery = typeof searchParams?.seller === "string" ? decodeURIComponent(searchParams.seller) : "";
+     |                                ^
+  53 |     const sellerId = conversationId.split("_")[1] ?? "";
+  54 |     return (
+  55 |         <main className="container mx-auto px-4 py-8 max-w-6xl">
+ GET /my-negotiations/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a 200 in 254ms (compile: 9ms, proxy.ts: 7ms, render: 239ms)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 183ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/chat/api/conversations/messages/697494248b1c75dd63759ffd_69392890beeab5195350c9ab_695e3618136282a4d32d755a?userId=697494248b1c75dd63759ffd&size=100 200 in 213ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ GET /quote-builder 200 in 26ms (compile: 5ms, proxy.ts: 6ms, render: 15ms)
+ GET /quote-builder 200 in 22ms (compile: 3ms, proxy.ts: 5ms, render: 13ms)
+ GET /quote-builder 200 in 18ms (compile: 2ms, proxy.ts: 4ms, render: 12ms)
+ GET / 200 in 226ms (compile: 5ms, proxy.ts: 5ms, render: 216ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 16ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 199ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 565ms (compile: 3ms, proxy.ts: 4ms, render: 557ms)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 234ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 193ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 6ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 49ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+✓ Compiled in 237ms
+✓ Compiled in 26ms
+✓ Compiled in 24ms
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+ GET / 200 in 723ms (compile: 4ms, proxy.ts: 5ms, render: 713ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 7ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 3ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 594ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 626ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 629ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 703ms (compile: 62ms, proxy.ts: 5ms, render: 636ms)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 272ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 198ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 5ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 73ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+✓ Compiled in 54ms
+✓ Compiled in 47ms
+✓ Compiled in 33ms
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 672ms (compile: 47ms, proxy.ts: 3ms, render: 623ms)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 383ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 385ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 519ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 64ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+✓ Compiled in 22ms
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 619ms (compile: 63ms, proxy.ts: 6ms, render: 550ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 4ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 132ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 201ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 339ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 49ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 2ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 62ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+ GET / 200 in 278ms (compile: 5ms, proxy.ts: 5ms, render: 269ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 8ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 3ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 214ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 201ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 205ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 359ms (compile: 3ms, proxy.ts: 8ms, render: 348ms)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 186ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 67ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 5ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 47ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+✓ Compiled in 32ms
+✓ Compiled in 19ms
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc
+FETCHING URL: https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser
+FETCHING URL: https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart
+ GET /vehicles 200 in 668ms (compile: 69ms, proxy.ts: 7ms, render: 592ms)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 3ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getCartCountForUser 200 in 187ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/api/v1/auth/getUserInfoByToken 200 in 201ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/search?sortBy=price&sortOrder=asc 200 in 353ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/inventory/api/v1/inventory/getUserCart 200 in 79ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+ │ GET https://qa-api.adpgauto.com/masters/api/filters/map 200 in 3ms (cache hit)
+ │ GET https://qa-api.adpgauto.com/masters/api/v1/mtoc/brands 200 in 62ms (cache skip)
+ │ │ Cache skipped reason: (auto no cache)
+✓ Compiled in 22ms
+✓ Compiled in 23ms
+✓ Compiled in 19ms
+✓ Compiled in 33ms
+✓ Compiled in 33ms
+✓ Compiled in 30ms
+✓ Compiled in 18ms
+✓ Compiled in 20ms
+[?25h
