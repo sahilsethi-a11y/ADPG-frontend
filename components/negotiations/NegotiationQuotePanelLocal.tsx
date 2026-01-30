@@ -60,9 +60,7 @@ type Props = {
     sellerName?: string;
     sellerId?: string;
     negotiationStatus?: string;
-    // Shared pricing state (from parent)
-    discountPercent: number;
-    onDiscountChange: (value: number) => void;
+    bucketDiscounts: Record<string, number>;
     downpaymentPercent: number;
     onDownpaymentChange: (value: number) => void;
     selectedPort: string;
@@ -77,6 +75,12 @@ type Props = {
         remainingBalance: number;
         bucketTotal: number;
         bucketName: string;
+        bucketSummaries: Array<{
+            key: string;
+            name: string;
+            total: number;
+            discountPercent: number;
+        }>;
     }) => Promise<void>;
     isSubmitting?: boolean;
     submissionError?: string | null;
@@ -86,8 +90,7 @@ export default function NegotiationQuotePanelLocal({
     sellerName,
     sellerId,
     negotiationStatus,
-    discountPercent,
-    onDiscountChange,
+    bucketDiscounts,
     downpaymentPercent,
     onDownpaymentChange,
     selectedPort,
@@ -120,19 +123,22 @@ export default function NegotiationQuotePanelLocal({
     const currency = buckets?.[0]?.currency;
 
     // Memoized price calculations - updates whenever discount changes
-    const { originalTotal, discountedTotal, discountAmount } = useMemo(() => {
+    const { originalTotal, discountedTotal, discountAmount, effectiveDiscountPercent } = useMemo(() => {
         const original = buckets.reduce((acc, b) => acc + b.bucketTotal, 0);
         const discountedPrice = buckets.reduce((acc, b) => {
-            const bucketDiscounted = b.bucketTotal * (1 - discountPercent / 100);
+            const bucketDiscount = bucketDiscounts[b.key] ?? 0;
+            const bucketDiscounted = b.bucketTotal * (1 - bucketDiscount / 100);
             return acc + bucketDiscounted;
         }, 0);
         const discountAmt = original - discountedPrice;
+        const effectiveDiscount = original > 0 ? (discountAmt / original) * 100 : 0;
         return {
             originalTotal: original,
             discountedTotal: discountedPrice,
             discountAmount: discountAmt,
+            effectiveDiscountPercent: effectiveDiscount,
         };
-    }, [buckets, discountPercent]);
+    }, [buckets, bucketDiscounts]);
 
     // Memoized downpayment calculations - updates whenever downpaymentPercent changes
     const { downpaymentAmount, remainingBalance } = useMemo(() => {
@@ -160,7 +166,7 @@ export default function NegotiationQuotePanelLocal({
         // Frontend validation
         if (!onSubmit || buckets.length < 1) return;
 
-        if (discountPercent < 0 || discountPercent > 100) {
+        if (effectiveDiscountPercent < 0 || effectiveDiscountPercent > 100) {
             return; // Should not happen with range input, but validate anyway
         }
 
@@ -177,7 +183,7 @@ export default function NegotiationQuotePanelLocal({
         }
 
         await onSubmit({
-            discountPercent,
+            discountPercent: Number(effectiveDiscountPercent.toFixed(2)),
             discountAmount,
             finalPrice: discountedTotal,
             downpaymentPercent,
@@ -185,6 +191,12 @@ export default function NegotiationQuotePanelLocal({
             remainingBalance,
             bucketTotal: originalTotal,
             bucketName: buckets[0]?.name || "Negotiation Items",
+            bucketSummaries: buckets.map((b) => ({
+                key: b.key,
+                name: b.name,
+                total: b.bucketTotal,
+                discountPercent: bucketDiscounts[b.key] ?? 0,
+            })),
         });
     };
 
@@ -194,23 +206,6 @@ export default function NegotiationQuotePanelLocal({
         <div className="border border-stroke-light rounded-lg p-5 bg-white">
             {/* Header */}
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Make a Proposal</h3>
-
-            {/* Discount Section */}
-            <div className="mb-5">
-                <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-gray-700">Discount per Bucket</label>
-                    <span className="text-sm font-semibold text-brand-blue">{discountPercent}%</span>
-                </div>
-                <input
-                    type="range"
-                    min={0}
-                    max={30}
-                    value={discountPercent}
-                    onChange={(e) => onDiscountChange(Number(e.target.value))}
-                    disabled={isDisabled}
-                    className="w-full accent-brand-blue disabled:opacity-50"
-                />
-            </div>
 
             {/* Price Summary Box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5 space-y-2">
@@ -255,17 +250,18 @@ export default function NegotiationQuotePanelLocal({
 
             {/* Port of Loading Dropdown */}
             <div className="mb-6">
-                <label className="text-xs font-medium text-gray-700 block mb-2">Port of Loading</label>
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-700">Port of Loading</label>
+                    <span className="text-xs text-gray-500">Seller standard default</span>
+                </div>
                 <select
                     value={selectedPort}
                     onChange={(e) => onPortChange(e.target.value)}
                     disabled={isDisabled}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white disabled:opacity-50"
                 >
-                    <option>Dubai</option>
-                    <option>Abu Dhabi</option>
-                    <option>Sharjah</option>
-                    <option>Other</option>
+                    <option>Yantai</option>
+                    <option>Ningbo</option>
                 </select>
             </div>
 

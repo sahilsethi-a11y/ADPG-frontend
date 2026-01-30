@@ -53,8 +53,13 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
         isSelected: true,
     };
 
-    const inspectionReportUrl =
-        data.vehicleDetails?.find((item: any) => item?.inspectionReportUrl)?.inspectionReportUrl ?? "";
+    const vin =
+        (data as any)?.vehicleDetails?.[0]?.vin ??
+        (data as any)?.vin ??
+        (data as any)?.VIN ??
+        (data as any)?.inventory?.vin ??
+        (data as any)?.inventory?.VIN ??
+        "";
 
     return (
         <main className="container mx-auto px-4 lg:px-6">
@@ -114,9 +119,9 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
                                     <div className="text-[16px] text-[#4d4f53] mb-6">{data.name}</div>
                                     <div className="mb-6 flex flex-col gap-3">
                                         <AddToCartButton vehicleId={vehicleSlug} storageItem={storageItem} sellerId={data.sellerInformation.id} sellerCompany={data.sellerInformation.name} />
-                                        {inspectionReportUrl ? (
+                                        {vin ? (
                                             <a
-                                                href={inspectionReportUrl}
+                                                href={`https://report.adpgauto.com/${encodeURIComponent(vin)}`}
                                                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all shrink-0 outline-none h-9 px-4 py-2 w-full border border-brand-blue text-gray-800 hover:bg-brand-blue hover:text-white"
                                                 rel="noopener noreferrer">
                                                 <FileIcon className="w-4 h-4" />

@@ -28,10 +28,18 @@ type NegotiationBucket = {
 type Props = {
   bucket: NegotiationBucket;
   discountPercent: number;
+  showDiscountControls?: boolean;
+  onDiscountChange?: (value: number) => void;
   isLocked?: boolean;
 };
 
-export default function NegotiationBucketCard({ bucket, discountPercent, isLocked }: Props) {
+export default function NegotiationBucketCard({
+  bucket,
+  discountPercent,
+  showDiscountControls,
+  onDiscountChange,
+  isLocked,
+}: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
   // Calculate discounted price
@@ -103,6 +111,25 @@ export default function NegotiationBucketCard({ bucket, discountPercent, isLocke
         </div>
       </div>
 
+      {/* Discount Controls */}
+      {showDiscountControls ? (
+        <div className="border-t border-gray-200 bg-white px-3 py-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-700">Discount</span>
+            <span className="text-xs font-semibold text-brand-blue">{discountPercent}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={30}
+            value={discountPercent}
+            onChange={(e) => onDiscountChange?.(Number(e.target.value))}
+            disabled={isLocked}
+            className="w-full accent-brand-blue disabled:opacity-50"
+          />
+        </div>
+      ) : null}
+
       {/* Expanded Content - Individual Units */}
       {isOpen && (
         <div className="border-t border-gray-200 bg-gray-50 px-3 py-2 space-y-2">
@@ -127,7 +154,7 @@ export default function NegotiationBucketCard({ bucket, discountPercent, isLocke
                     {formatPrice(itemDisplayPrice * item.quantity, item.currency)}
                   </p>
                   {showDiscount && (
-                    <p className="text-[10px] text-gray-400">
+                    <p className="text-[10px] text-gray-400 line-through">
                       {formatPrice(item.price * item.quantity, item.currency)}
                     </p>
                   )}

@@ -154,6 +154,7 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
                 window.localStorage.setItem(quoteItemsStorageKey, JSON.stringify(next));
                 const ids = next.map((i) => i.id);
                 window.localStorage.setItem(quoteStorageKey, JSON.stringify(ids));
+                window.dispatchEvent(new Event("quoteBuilderUpdated"));
             } catch {}
         }
     };
@@ -176,27 +177,16 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
     }, [items]);
 
     const grouped = useMemo(() => groupBySellerAndBucket(items), [items]);
-    const selectedItems = items.filter((i) => i.isSelected !== false) ?? [];
-    const isAllSelected = selectedItems?.length === items.length;
-    const selectedUnits = selectedItems.reduce((acc, i) => acc + i.quantity, 0);
-    const fobTotal = selectedItems.reduce((acc, i) => acc + i.quantity * i.price, 0);
+    const fobTotal = items.reduce((acc, i) => acc + i.quantity * i.price, 0);
     const totalPayable = fobTotal;
     const currency = items?.[0]?.currency;
 
-    const handleSelectAll = () => {
-        const next = items.map((i) => ({ ...i, isSelected: !isAllSelected }));
-        persistItems(next);
-    };
 
     const handleRemoveItem = (itemId: string) => {
         const next = items.filter((i) => i.id !== itemId);
         persistItems(next);
     };
 
-    const handleSelect = (itemId: string) => {
-        const next = items.map((i) => (i.id === itemId ? { ...i, isSelected: !(i.isSelected !== false) } : i));
-        persistItems(next);
-    };
 
     if (items?.length < 1) {
         return (
@@ -207,18 +197,8 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
     }
 
     return (
-        <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-                <div className="flex items-center justify-between p-4 border border-stroke-light rounded-xl">
-                    <label className="flex gap-2">
-                        <input className="accent-brand-blue" checked={isAllSelected} onChange={() => handleSelectAll()} type="checkbox" />
-                        <span>Select All ({items.length} Items)</span>
-                    </label>
-                    <div className="text-sm text-gray-600">
-                        {selectedItems?.length} of {items.length} selected
-                    </div>
-                </div>
-
+        <div className="flex justify-center">
+            <div className="w-full max-w-5xl space-y-6">
                 {grouped.map((seller) => (
                     <div key={seller.sellerCompany} className="space-y-4 border border-stroke-light/70 rounded-xl p-3">
                         <div className="flex items-center justify-between">
@@ -242,59 +222,25 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
                         </div>
 
                         {seller.buckets.map((bucket) => (
-                            <div key={bucket.key} className="space-y-3">
+                            <div key={bucket.key} className="space-y-3 rounded-lg border border-stroke-light/60 bg-gray-50/60 p-3">
                                 <div className="flex items-center justify-between text-sm text-gray-600">
-                                    <span className="font-medium text-gray-800">
+                                    <span className="text-base font-semibold text-gray-900">
                                         {bucket.name} ({bucket.year})
                                     </span>
-                                    <span>{bucket.totalUnits} units</span>
+                                    <span className="font-medium">{bucket.totalUnits} units</span>
                                 </div>
                                 {bucket.items.map((item) => (
-                                    <QuoteCard key={item.id} item={item} onRemove={handleRemoveItem} onSelect={handleSelect} />
+                                    <QuoteCard key={item.id} item={item} onRemove={handleRemoveItem} />
                                 ))}
                             </div>
                         ))}
                     </div>
                 ))}
-            </div>
-
-            <div>
-                <div className="flex flex-col gap-6 rounded-xl border border-stroke-light p-6 sticky top-20">
-                    <div className="grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5">
-                        <h4 className="leading-none text-brand-blue">Quote Summary</h4>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="flex justify-between">
-                            <span>Selected Items:</span>
-                            <span>{selectedItems?.length}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Selected Units:</span>
-                            <span>{selectedUnits}</span>
-                        </div>
-                        <div className="bg-border shrink-0"></div>
-                        <div className="flex justify-between">
-                            <span>FOB Total:</span>
-                            <span>{formatPrice(fobTotal, currency)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Logistics Fees:</span>
-                            <span>—</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Platform fees:</span>
-                            <span>Calculated at checkout</span>
-                        </div>
-                        <div className="bg-border shrink-0 "></div>
-                        <div className="flex justify-between text-xl">
-                            <span>Total Amount:</span>
-                            <span>{formatPrice(totalPayable, currency)}</span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-2">* Token payments: Remaining balance will be collected on delivery</div>
-                        <Button onClick={() => router.push("/my-cart")} fullWidth={true} size="sm">
-                            Continue to Cart
-                        </Button>
-                    </div>
+                <div className="flex items-center justify-between rounded-xl border border-stroke-light px-4 py-3">
+                    <span className="text-sm text-gray-600">Total value</span>
+                    <span className="text-lg font-semibold text-gray-900">
+                        {formatPrice(totalPayable, currency)}
+                    </span>
                 </div>
             </div>
         </div>
@@ -304,11 +250,9 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
 const QuoteCard = ({
     item,
     onRemove,
-    onSelect,
 }: {
     item: QuoteItem;
     onRemove: (id: string) => void;
-    onSelect: (id: string) => void;
 }) => {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -319,15 +263,11 @@ const QuoteCard = ({
         setLoading(false);
     };
 
-    const handleOpenListing = () => {
-        router.push(`/vehicles/${item.id}`);
-    };
 
     return (
         <div className="text-foreground flex w-full bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-stroke-light">
             <div className="flex gap-4 p-4 w-full">
                 <div className="flex items-start gap-3 shrink-0">
-                    <input className="accent-brand-blue mt-1" checked={item.isSelected !== false} onChange={() => onSelect(item.id)} type="checkbox" />
                     <div className="relative h-20 w-28 bg-gray-100 overflow-hidden rounded-lg">
                         <Image src={item.mainImageUrl} alt={item.name} height={80} width={112} className="h-20 w-28 object-cover" />
                     </div>
@@ -363,9 +303,6 @@ const QuoteCard = ({
                     </div>
 
                     <div className="mt-3 flex justify-end gap-2">
-                        <Button onClick={handleOpenListing} size="sm" variant="secondary">
-                            Open Listing
-                        </Button>
                         <Button loading={loading} onClick={handleRemoveItem} size="sm" leftIcon={<DeleteIcon className="h-3 w-3" />} type="button" variant="danger">
                             Remove
                         </Button>

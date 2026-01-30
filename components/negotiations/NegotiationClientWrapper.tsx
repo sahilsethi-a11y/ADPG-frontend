@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "@/lib/api/client-request";
 import NegotiationItemsSection from "./NegotiationItemsSection";
 import NegotiationQuotePanelLocal from "./NegotiationQuotePanelLocal";
-import YourProposalSummary from "./YourProposalSummary";
 import Conversation, { NegotiationInfo, type Message } from "./Conversation";
+import YourProposalSummary from "./YourProposalSummary";
 
 type Props = {
     negotiationStatus?: string;
@@ -31,6 +31,12 @@ type ActiveProposal = {
     submittedAt: string;
     bucketName: string;
     bucketTotal: number;
+    bucketSummaries: Array<{
+        key: string;
+        name: string;
+        total: number;
+        discountPercent: number;
+    }>;
 };
 
 /**
@@ -51,7 +57,7 @@ export default function NegotiationClientWrapper({
     // ==========================================
     // Shared State Management (PAGE LEVEL)
     // ==========================================
-    const [discountPercent, setDiscountPercent] = useState(0);
+    const [bucketDiscounts, setBucketDiscounts] = useState<Record<string, number>>({});
     const [downpaymentPercent, setDownpaymentPercent] = useState(10);
     const [selectedPort, setSelectedPort] = useState("Dubai");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,50 +80,15 @@ export default function NegotiationClientWrapper({
             remainingBalance: number;
             bucketTotal: number;
             bucketName: string;
+            bucketSummaries: Array<{
+                key: string;
+                name: string;
+                total: number;
+                discountPercent: number;
+            }>;
         }) => {
             setIsSubmitting(true);
 
-            // ✅ FRONTEND-ONLY: No API calls, just state updates
-            // This simulates successful proposal submission
-            // Backend integration can be added later by uncommenting API call below
-
-            // Simulate a brief delay for UX (like a real API call)
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // ✅ Update UI state immediately (optimistic update)
-            setUiStatus("BUYER_PROPOSED");
-
-            // Store the submitted proposal values
-            setActiveProposal({
-                discountPercent: proposalData.discountPercent,
-                discountAmount: proposalData.discountAmount,
-                finalPrice: proposalData.finalPrice,
-                downpaymentPercent: proposalData.downpaymentPercent,
-                downpaymentAmount: proposalData.downpaymentAmount,
-                remainingBalance: proposalData.remainingBalance,
-                selectedPort,
-                submittedAt: new Date().toISOString(),
-                bucketName: proposalData.bucketName,
-                bucketTotal: proposalData.bucketTotal,
-            });
-
-            // Dispatch event to add system message to conversation
-            window.dispatchEvent(
-                new CustomEvent("proposalSubmitted", {
-                    detail: {
-                        discountPercent: proposalData.discountPercent,
-                        finalPrice: proposalData.finalPrice,
-                        downpaymentPercent: proposalData.downpaymentPercent,
-                    },
-                })
-            );
-
-            // Clear any errors
-            setSubmissionError(null);
-            setIsSubmitting(false);
-
-            // 🔧 BACKEND INTEGRATION: Uncomment below when backend is ready
-            /*
             try {
                 const response = await api.post<{ status: string }>(
                     `/chat/api/conversations/${conversationId}/submit-proposal`,
@@ -133,18 +104,48 @@ export default function NegotiationClientWrapper({
                         },
                     }
                 );
+
                 if (response?.status !== "OK") {
                     setSubmissionError("Failed to submit proposal. Please try again.");
                     setUiStatus("IDLE");
                     setActiveProposal(null);
+                    setIsSubmitting(false);
+                    return;
                 }
-            } catch (error) {
+
+                setUiStatus("BUYER_PROPOSED");
+                setActiveProposal({
+                    discountPercent: proposalData.discountPercent,
+                    discountAmount: proposalData.discountAmount,
+                    finalPrice: proposalData.finalPrice,
+                    downpaymentPercent: proposalData.downpaymentPercent,
+                    downpaymentAmount: proposalData.downpaymentAmount,
+                    remainingBalance: proposalData.remainingBalance,
+                    selectedPort,
+                    submittedAt: new Date().toISOString(),
+                    bucketName: proposalData.bucketName,
+                    bucketTotal: proposalData.bucketTotal,
+                    bucketSummaries: proposalData.bucketSummaries,
+                });
+
+                window.dispatchEvent(
+                    new CustomEvent("proposalSubmitted", {
+                        detail: {
+                            discountPercent: proposalData.discountPercent,
+                            finalPrice: proposalData.finalPrice,
+                            downpaymentPercent: proposalData.downpaymentPercent,
+                        },
+                    })
+                );
+
+                setSubmissionError(null);
+                setIsSubmitting(false);
+            } catch {
                 setSubmissionError("Network error. Please try again.");
                 setUiStatus("IDLE");
                 setActiveProposal(null);
                 setIsSubmitting(false);
             }
-            */
         },
         [selectedPort]
     );
@@ -152,14 +153,10 @@ export default function NegotiationClientWrapper({
     // ==========================================
     // Derived Values
     // ==========================================
-    const discountState = useMemo(
-        () => ({
-            discountPercent,
-            downpaymentPercent,
-            selectedPort,
-        }),
-        [discountPercent, downpaymentPercent, selectedPort]
-    );
+    const isBuyer = role?.toLowerCase() === "buyer";
+    const handleBucketDiscountChange = useCallback((bucketKey: string, value: number) => {
+        setBucketDiscounts((prev) => ({ ...prev, [bucketKey]: value }));
+    }, []);
 
     // Determine if UI should show locked/disabled state
     const isProposalSubmitted = uiStatus === "BUYER_PROPOSED";
@@ -172,7 +169,9 @@ export default function NegotiationClientWrapper({
                 <NegotiationItemsSection
                     sellerName={sellerName}
                     sellerId={sellerId}
-                    discountPercent={discountPercent}
+                    isBuyer={isBuyer}
+                    bucketDiscounts={bucketDiscounts}
+                    onBucketDiscountChange={handleBucketDiscountChange}
                     isLocked={isProposalSubmitted}
                 />
 
@@ -203,32 +202,22 @@ export default function NegotiationClientWrapper({
             {/* Right Column: Status Card and Make a Proposal / Your Proposal Summary */}
             <div className="space-y-6 h-fit lg:sticky lg:top-8">
                 {/* Status Card - Shows current negotiation status */}
-                {isProposalSubmitted ? (
-                    <div className="border border-stroke-light rounded-lg p-5 bg-white">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-3">Status</h3>
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 border border-blue-200">
-                            <span className="text-xs font-semibold text-blue-700">Buyer Proposed</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-3">Buyer has submitted a proposal. Waiting for seller response.</p>
+                <div className="border border-stroke-light rounded-lg p-5 bg-white">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-gray-900">Status</h3>
+                        <StatusBadge status={negotiationStatus || ""} isBuyerProposed={isProposalSubmitted} />
                     </div>
-                ) : null}
+                    <p className="text-sm text-gray-600">{getStatusMessage(negotiationStatus, isProposalSubmitted)}</p>
+                </div>
 
                 {/* Show appropriate panel based on submission status */}
                 {sellerName || sellerId ? (
-                    isProposalSubmitted && activeProposal ? (
-                        // AFTER SUBMISSION: Show Your Proposal Summary
-                        <YourProposalSummary
-                            proposal={activeProposal}
-                            currency={currency || "USD"}
-                        />
-                    ) : (
-                        // BEFORE SUBMISSION: Show Make a Proposal Form
+                    !isProposalSubmitted ? (
                         <NegotiationQuotePanelLocal
                             sellerName={sellerName}
                             sellerId={sellerId}
                             negotiationStatus={negotiationStatus}
-                            discountPercent={discountPercent}
-                            onDiscountChange={setDiscountPercent}
+                            bucketDiscounts={bucketDiscounts}
                             downpaymentPercent={downpaymentPercent}
                             onDownpaymentChange={setDownpaymentPercent}
                             selectedPort={selectedPort}
@@ -237,9 +226,52 @@ export default function NegotiationClientWrapper({
                             isSubmitting={isSubmitting}
                             submissionError={submissionError}
                         />
-                    )
+                    ) : activeProposal ? (
+                        <YourProposalSummary proposal={activeProposal} currency={currency || "USD"} />
+                    ) : null
                 ) : null}
             </div>
         </>
     );
 }
+
+const getStatusMessage = (status?: string, isBuyerProposed?: boolean) => {
+    if (isBuyerProposed) return "Buyer has submitted a proposal. Waiting for seller response.";
+    const statusLower = status?.toLowerCase() || "";
+    if (statusLower === "ongoing") return "Waiting for a proposal to be submitted.";
+    if (statusLower === "otppending") return "OTP verification pending. Check your email.";
+    if (statusLower === "agreed") return "Negotiation completed successfully!";
+    return "Negotiation in progress...";
+};
+
+const StatusBadge = ({ status, isBuyerProposed }: Readonly<{ status: string; isBuyerProposed?: boolean }>) => {
+    if (isBuyerProposed) {
+        return (
+            <div className="flex gap-2 items-center">
+                <span className="text-xs py-1 px-2.5 rounded-full bg-blue-100 text-blue-700 font-medium">Buyer Proposed</span>
+            </div>
+        );
+    }
+
+    if (status?.toLowerCase() === "ongoing")
+        return (
+            <div className="flex gap-2 items-center">
+                <span className="text-xs py-1 px-2.5 rounded-full bg-blue-100 text-blue-700 font-medium">Idle</span>
+            </div>
+        );
+
+    if (status?.toLowerCase() === "otppending")
+        return (
+            <div className="flex gap-2 items-center">
+                <span className="text-xs py-1 px-2.5 rounded-full bg-yellow-100 text-yellow-700 font-medium">Pending</span>
+            </div>
+        );
+    if (status?.toLowerCase() === "agreed")
+        return (
+            <div className="flex gap-2 items-center">
+                <span className="text-xs py-1 px-2.5 rounded-full bg-green-100 text-green-700 font-medium">Accepted</span>
+            </div>
+        );
+
+    return <></>;
+};

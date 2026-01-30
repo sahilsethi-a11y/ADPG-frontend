@@ -13,6 +13,12 @@ type ActiveProposal = {
   submittedAt: string;
   bucketName: string;
   bucketTotal: number;
+  bucketSummaries?: Array<{
+    key: string;
+    name: string;
+    total: number;
+    discountPercent: number;
+  }>;
 };
 
 type Props = {
@@ -32,14 +38,31 @@ export default function YourProposalSummary({ proposal, currency }: Props) {
           <span className="text-lg">✓</span>
           <p className="text-xs font-medium text-green-700">Discounts Applied</p>
         </div>
-        <div className="space-y-1 ml-6">
-          <p className="text-sm font-semibold text-gray-900">
-            {proposal.bucketName} ({Math.round(proposal.bucketTotal / 1000)}k units)
-          </p>
-          <p className="text-xs text-gray-600">
-            <span className="line-through">${Math.round(proposal.bucketTotal).toLocaleString()}</span>
-            <span className="ml-2 font-semibold text-green-700">-{proposal.discountPercent}%</span>
-          </p>
+        <div className="space-y-2 ml-6">
+          {(proposal.bucketSummaries ?? []).map((bucket) => {
+            const hasDiscount = bucket.discountPercent > 0;
+            const finalBucketTotal = bucket.total * (1 - bucket.discountPercent / 100);
+            return (
+              <div key={bucket.key} className="text-xs text-gray-600">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-gray-900 truncate">{bucket.name}</span>
+                  {hasDiscount ? (
+                    <span className="text-green-700 font-semibold">-{bucket.discountPercent}%</span>
+                  ) : (
+                    <span className="text-gray-400">No discount</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={hasDiscount ? "line-through text-gray-400" : "text-gray-700"}>
+                    {formatPrice(bucket.total, currency)}
+                  </span>
+                  {hasDiscount ? (
+                    <span className="text-green-700 font-semibold">{formatPrice(finalBucketTotal, currency)}</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

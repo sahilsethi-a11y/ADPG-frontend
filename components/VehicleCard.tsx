@@ -16,40 +16,41 @@ type Props = Readonly<{
 
     // Bucket props
     bucketCount?: number; // now shown for 1 too
+    bucketAddedCount?: number;
     bucketVariant?: string;
     bucketPriceRange?: { min: number; max: number; currency?: string };
 
     // Bucket modal trigger button
     viewAllLabel?: string;
     onViewAllClick?: () => void;
-    isInQuoteBuilder?: boolean;
 }>;
 
-export default function ({
-    item,
-    bucketCount,
-    bucketVariant,
-    bucketPriceRange,
-    viewAllLabel,
-    onViewAllClick,
-    isInQuoteBuilder = false,
-}: Props) {
+export default function VehicleCard({ item, bucketCount, bucketVariant, bucketPriceRange, viewAllLabel, onViewAllClick }: Props) {
     const router = useRouter();
+    const formatPriceNoDecimals = (value: number | string, currency = "USD") =>
+        new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(Number(value) || 0);
 
     /**
      * ✅ Always show units badge if bucketCount was passed, including 1
      */
-    const unitsLabel =
-        typeof bucketCount === "number" ? (
+    const unitsLabel = (() => {
+        if (typeof bucketCount !== "number") return null;
+        const addedCount = typeof bucketAddedCount === "number" ? bucketAddedCount : 0;
+        const label =
+            addedCount > 0
+                ? `${addedCount} of ${bucketCount} added`
+                : `${bucketCount} unit${bucketCount === 1 ? "" : "s"}`;
+        return (
             <span className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[10px] font-medium text-gray-700 px-2 py-0.5 whitespace-nowrap">
-                {bucketCount} unit{bucketCount === 1 ? "" : "s"}
+                {label}
             </span>
-        ) : null;
-    const quoteBadge = isInQuoteBuilder ? (
-        <span className="inline-flex items-center justify-center rounded-full border border-green-200 bg-green-50 text-[10px] font-medium text-green-700 px-2 py-0.5 whitespace-nowrap">
-            In Quote Builder
-        </span>
-    ) : null;
+        );
+    })();
 
     /**
      * ✅ Replace bulk pill with variant label (if provided)
@@ -60,16 +61,19 @@ export default function ({
      * ✅ Price range display (kept one-line, with responsive font size)
      */
     const priceText = (() => {
-        if (!bucketPriceRange) return formatPrice(item.inventory?.price, item.inventory?.currency);
+        if (!bucketPriceRange) {
+            const price = Math.round(Number(item.inventory?.price) || 0);
+            return formatPriceNoDecimals(price, item.inventory?.currency);
+        }
 
         const currency = bucketPriceRange.currency ?? item.inventory?.currency;
 
         if (bucketPriceRange.min === bucketPriceRange.max) {
-            return formatPrice(String(Math.round(bucketPriceRange.min)), currency);
+            return formatPriceNoDecimals(Math.round(bucketPriceRange.min), currency);
         }
 
-        return `${formatPrice(String(Math.round(bucketPriceRange.min)), currency)} - ${formatPrice(
-            String(Math.round(bucketPriceRange.max)),
+        return `${formatPriceNoDecimals(Math.round(bucketPriceRange.min), currency)} - ${formatPriceNoDecimals(
+            Math.round(bucketPriceRange.max),
             currency
         )}`;
     })();
@@ -125,14 +129,11 @@ export default function ({
                 <div className="p-4 last:pb-6">
                     <div className="flex items-start justify-between gap-2 mb-2">
                         <h3 className="text-base font-medium text-gray-900 truncate w-full">
-                            <Link href={`/vehicles/${item.inventory?.id}`} onClick={(e) => e.stopPropagation()} className="hover:text-brand-blue transition-colors">
+                            <Link href={`/vehicles/${item.inventory?.brand}-${item.inventory?.model}`} onClick={(e) => e.stopPropagation()}>
                                 {item.inventory?.year} {item.inventory?.brand} {item.inventory?.model}
                             </Link>
                         </h3>
-                        <div className="flex items-center gap-2">
-                            {unitsLabel}
-                            {quoteBadge}
-                        </div>
+                        {unitsLabel}
                     </div>
 
                     <p className="text-xs text-gray-500 mb-3 w-full line-clamp-2">

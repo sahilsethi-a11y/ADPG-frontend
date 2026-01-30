@@ -44,7 +44,7 @@ export default function NegotiatePriceButton({ vehicleId, peerId }: Readonly<{ v
     return (
         <Button variant="outline" disabled={disabled} className="w-full" loading={loading} onClick={() => handleNegotiatePrice()}>
             <MessageSquareIcon className="w-4 h-4 mr-2" />
-            Negotiate Price
+            Start quotation
         </Button>
     );
 }

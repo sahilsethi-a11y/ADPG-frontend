@@ -27,7 +27,9 @@ type NegotiationBucket = {
 type Props = {
   sellerName?: string;
   sellerId?: string;
-  discountPercent: number;
+  isBuyer?: boolean;
+  bucketDiscounts: Record<string, number>;
+  onBucketDiscountChange: (bucketKey: string, value: number) => void;
   isLocked?: boolean;
 };
 
@@ -70,7 +72,14 @@ const buildBucketGroups = (items: QuoteItem[]): NegotiationBucket[] => {
   return Array.from(map.values());
 };
 
-export default function NegotiationItemsSection({ sellerName, sellerId, discountPercent, isLocked }: Props) {
+export default function NegotiationItemsSection({
+  sellerName,
+  sellerId,
+  isBuyer,
+  bucketDiscounts,
+  onBucketDiscountChange,
+  isLocked,
+}: Props) {
   const [items, setItems] = useState<QuoteItem[]>([]);
 
   // Load from localStorage on mount
@@ -135,7 +144,9 @@ export default function NegotiationItemsSection({ sellerName, sellerId, discount
           <NegotiationBucketCard
             key={bucket.key}
             bucket={bucket}
-            discountPercent={discountPercent}
+            discountPercent={bucketDiscounts[bucket.key] ?? 0}
+            showDiscountControls={isBuyer === true}
+            onDiscountChange={(value) => onBucketDiscountChange(bucket.key, value)}
             isLocked={isLocked}
           />
         ))}

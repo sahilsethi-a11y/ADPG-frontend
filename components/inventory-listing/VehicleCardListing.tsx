@@ -1,17 +1,20 @@
 "use client";
 
-import type { Content } from "@/app/vehicles/page";
+import type { Content, Data } from "@/app/vehicles/page";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import SortedBy from "@/components/SortedBy";
 import VehicleCard from "@/components/VehicleCard";
 import type { SearchParams } from "next/dist/server/request/search-params";
-import { formatPrice } from "@/lib/utils";
 import Image from "@/elements/Image";
-import { MapPinIcon } from "@/components/Icons";
-import PriceBadge from "@/elements/PriceBadge";
+import { EyeIcon, MapPinIcon } from "@/components/Icons";
+import ShortList from "@/components/vehicle-details/ShortList";
+import QRShare from "@/components/vehicle-details/QRShare";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Button from "@/elements/Button";
-import AddToCartButton from "@/components/buyer/AddToCardButton";
+import PriceBadge from "@/elements/PriceBadge";
+import Select from "@/elements/Select";
+import { api } from "@/lib/api/client-request";
 
 type PropsT = {
   initialData: Content[];
@@ -21,7 +24,6 @@ type PropsT = {
   totalItems: number;
   totalPages: number;
   pageSize: number;
-  cartInventoryIds: string[];
 };
 
 type InventoryMaybeExtended = Content["inventory"] & {
@@ -35,6 +37,10 @@ type InventoryMaybeExtended = Content["inventory"] & {
   odometer?: string | number;
   odometerKm?: string | number;
   km?: string | number;
+  inventoryData?: {
+    vin?: string;
+    mileage?: string | number;
+  };
 };
 
 type Bucket = {
@@ -57,6 +63,8 @@ type Bucket = {
 
   minPrice: number;
   maxPrice: number;
+  minMileage?: number;
+  maxMileage?: number;
 };
 
 const safeStr = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -96,18 +104,41 @@ const parsePrice = (price: unknown) => {
   return 0;
 };
 
-const getMileage = (inv: InventoryMaybeExtended) => {
-  const v = inv.mileage ?? inv.odometer ?? inv.odometerKm ?? inv.km;
+const getMileage = (inv: InventoryMaybeExtended, inventoryData?: { mileage?: string | number }) => {
+  const v =
+    inventoryData?.mileage ??
+    inv.inventoryData?.mileage ??
+    inv.mileage ??
+    inv.odometer ??
+    inv.odometerKm ??
+    inv.km;
   if (v === undefined || v === null) return "";
   const s = `${v}`.trim();
   return s ? s : "";
 };
 
-const getVin = (inv: InventoryMaybeExtended) => {
-  const v = inv.vin ?? inv.VIN;
+const parseMileage = (value: string) => {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[^0-9.]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const getVin = (inv: InventoryMaybeExtended, inventoryData?: { vin?: string }) => {
+  const v = inventoryData?.vin ?? inv.inventoryData?.vin ?? inv.vin ?? inv.VIN;
   const s = safeStr(v);
   return s ? s : "—";
 };
+
+const normalizeId = (id: string | number | undefined | null) => String(id ?? "");
+
+const formatPriceNoDecimals = (value: number | string, currency = "USD") =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
 
 const buildBucketKey = (inv: InventoryMaybeExtended) => {
   const brand = safeStr(inv.brand).toLowerCase();
@@ -129,6 +160,9 @@ const bucketListings = (items: Content[]): Bucket[] => {
 
     const price = parsePrice(inv.price);
     const currency = safeStr(inv.currency) || undefined;
+    const inventoryData = (item as any)?.inventoryData ?? (inv as any)?.inventoryData;
+    const mileageRaw = getMileage(inv, inventoryData);
+    const mileageNum = parseMileage(mileageRaw);
 
     const existing = map.get(key);
     if (!existing) {
@@ -149,6 +183,8 @@ const bucketListings = (items: Content[]): Bucket[] => {
 
         minPrice: price,
         maxPrice: price,
+        minMileage: mileageNum,
+        maxMileage: mileageNum,
       });
     } else {
       existing.count += 1;
@@ -156,6 +192,12 @@ const bucketListings = (items: Content[]): Bucket[] => {
       existing.currency = existing.currency || currency;
       existing.minPrice = Math.min(existing.minPrice, price);
       existing.maxPrice = Math.max(existing.maxPrice, price);
+      if (mileageNum !== undefined) {
+        existing.minMileage =
+          existing.minMileage === undefined ? mileageNum : Math.min(existing.minMileage, mileageNum);
+        existing.maxMileage =
+          existing.maxMileage === undefined ? mileageNum : Math.max(existing.maxMileage, mileageNum);
+      }
     }
   }
 
@@ -165,11 +207,17 @@ const bucketListings = (items: Content[]): Bucket[] => {
 // ---------- SlideOver (right side) ----------
 function SlideOver({
   isOpen,
+  title,
   onClose,
+  isExpanded,
+  onToggleExpand,
   children,
 }: {
   isOpen: boolean;
+  title: string;
   onClose: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
   children: React.ReactNode;
 }) {
   // lock background scroll
@@ -190,19 +238,29 @@ function SlideOver({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
 
       {/* right drawer */}
-      <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl border-l border-stroke-light flex flex-col">
-        {/* Minimal header with only X button */}
-        <div className="flex justify-end p-4 shrink-0">
-          <button
-            className="h-7 w-7 p-1 rounded-md hover:bg-gray-100 flex items-center justify-center"
-            onClick={onClose}
-            type="button"
-            aria-label="Close"
-          >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div
+        className={`absolute inset-y-0 right-0 w-full bg-white shadow-2xl border-l border-stroke-light flex flex-col ${
+          isExpanded ? "max-w-5xl" : "max-w-xl"
+        }`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stroke-light shrink-0">
+          <div className="font-semibold text-black truncate">{title}</div>
+          <div className="flex items-center gap-2">
+            <button
+              className="h-9 px-3 rounded-md border border-stroke-light hover:bg-gray-50 text-xs font-medium"
+              onClick={onToggleExpand}
+              type="button"
+            >
+              {isExpanded ? "Make smaller" : "Expand"}
+            </button>
+            <button
+              className="h-9 px-3 rounded-md border border-stroke-light hover:bg-gray-50"
+              onClick={onClose}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         {/* scrollable content */}
@@ -212,22 +270,60 @@ function SlideOver({
   );
 }
 
+function CommonPill({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap bg-gray-50 text-gray-600 border-gray-300">
+      {label}
+    </span>
+  );
+}
 
 /**
- * Unit card row matching Figma design:
- * Horizontal layout with larger image, clear VIN/mileage, price on right, CTA button
+ * Unit row design matches card style:
+ * rounded-xl, shadow-sm, border-stroke-light, spacing similar.
  */
 function UnitCardRow({
   item,
   isInQuoteBuilder,
-  onAdded,
+  canUseQuoteBuilder,
+  onAddToQuote,
+  onRemoveFromQuote,
 }: {
   item: Content;
-  isInQuoteBuilder?: boolean;
-  onAdded?: (inventoryId: string) => void;
+  isInQuoteBuilder: boolean;
+  canUseQuoteBuilder: boolean;
+  onAddToQuote: (payload: {
+    id: string;
+    storageItem: {
+      id: string;
+      name: string;
+      year: number;
+      location: string;
+      quantity: number;
+      price: number;
+      currency: string;
+      mainImageUrl: string;
+      sellerCompany: string;
+      sellerId?: string;
+      bucketKey: string;
+      isSelected?: boolean;
+    };
+  }) => void;
+  onRemoveFromQuote: (id: string) => void;
 }) {
   const router = useRouter();
   const inv = item.inventory as InventoryMaybeExtended;
+
+  const inventoryData = (item as any)?.inventoryData;
+  const mileage = getMileage(inv, inventoryData);
+  const vin = getVin(inv, inventoryData);
+  const reportUrl =
+    vin && vin !== "—"
+      ? `https://report.adpgauto.com/${encodeURIComponent(vin)}`
+      : (inv as any)?.inspectionReportUrl ??
+        (inv as any)?.inventoryData?.inspectionReportUrl ??
+        (item as any)?.inventoryData?.inspectionReportUrl;
+  const price = formatPriceNoDecimals(inv.price, inv.currency);
   const sellerId = item?.inventory?.userId || (item as any)?.user?.userId;
   const sellerCompany =
     item?.user?.roleMetaData?.companyName || item?.user?.roleMetaData?.dealershipName;
@@ -244,95 +340,99 @@ function UnitCardRow({
     sellerId: sellerId,
     bucketKey: buildBucketKey(inv),
     isSelected: true,
-
-    // Individual vehicle fields for grouping and display
-    brand: safeStr(inv.brand) || undefined,
-    model: safeStr(inv.model) || undefined,
-    variant: safeStr(inv.variant) || undefined,
-    color: safeStr(inv.color) || undefined,
-    condition: safeStr(inv.condition) || undefined,
-    bodyType: safeStr(inv.bodyType) || undefined,
-  };
-
-  const mileage = getMileage(inv);
-  const vin = getVin(inv);
-  const price = formatPrice(inv.price, inv.currency);
-
-  const handleOpenListing = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    router.push(`/vehicles/${inv.id}`);
   };
 
   return (
-    <div className="text-foreground flex w-full bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200">
-      {/* Thumbnail block - reduced */}
-      <div className="relative h-40 w-52 bg-gray-100 overflow-hidden shrink-0">
+    <div
+      className="text-foreground flex w-full bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-stroke-light cursor-pointer"
+      onClick={() => router.push(`/vehicles/${inv.id}`)}
+    >
+      {/* Thumbnail block like card image */}
+      <div className="relative h-24 w-32 bg-gray-100 overflow-hidden shrink-0">
         <Image
           src={inv.mainImageUrl}
           alt={`${inv.brand} ${inv.model}`}
           fill={true}
-          height={160}
-          width={208}
-          className="w-full h-full object-cover"
+          height={96}
+          width={128}
+          className="w-full object-cover"
         />
+        <div className="absolute top-2.5 right-2.5">
+          <ShortList
+            onlyHeart={true}
+            isLike={false}
+            inventoryId={item.id}
+            iconCls="h-3 w-3 text-gray-600"
+            cls="bg-white h-6 w-6 p-0 rounded-md shadow-sm hover:bg-gray-50 justify-center"
+          />
+        </div>
       </div>
 
-      {/* Content area with flex layout - compact */}
-      <div className="flex-1 px-5 py-4 flex flex-col justify-between items-center">
-        {/* Top: VIN and Mileage */}
-        <div className="flex flex-col gap-1.5 w-full">
-          <div className="text-sm text-gray-600">
-            VIN: <span className="font-medium text-gray-800">{vin}</span>
-          </div>
-          {mileage ? (
-            <div className="text-sm text-gray-600 flex items-center gap-1">
-              <span className="text-gray-400 text-base">↔</span>
-              <span className="font-medium text-gray-800">{mileage} km</span>
+      <div className="flex-1 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-900 truncate flex items-center gap-2">
+              <span className="truncate">
+                {inv.year} {inv.brand} {inv.model}
+              </span>
+              {canUseQuoteBuilder && isInQuoteBuilder ? (
+                <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-[10px] font-medium w-fit whitespace-nowrap bg-green-50 text-green-700 border-green-200">
+                  In Quote Builder
+                </span>
+              ) : null}
             </div>
-          ) : null}
+            <div className="mt-1 text-xs text-gray-500 space-y-1">
+              <div>VIN: {vin || "—"}</div>
+              <div>Mileage: {mileage || "—"}</div>
+            </div>
+          </div>
+
+          {/* Price area aligned like card */}
+          <div className="shrink-0 text-right">
+            <div className="text-base font-semibold flex gap-1 items-center text-gray-900 whitespace-nowrap leading-none">
+              {price} <PriceBadge />
+            </div>
+          </div>
         </div>
 
-        {/* Bottom: Price and Buttons */}
-        <div className="flex items-center justify-between gap-2 w-full mt-2">
-          {/* Price */}
-          <div className="flex-1">
-            <div className="text-xl font-bold text-gray-900">
-              {price}
-            </div>
-          </div>
+        {/* Actions */}
+        <div className="mt-3 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const url = reportUrl;
+              if (url) window.open(url, "_blank", "noopener,noreferrer");
+            }}
+            disabled={!reportUrl}
+            className="h-8 px-3 rounded-md border border-stroke-light text-gray-700 hover:bg-gray-50 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            View report
+          </button>
 
-          {/* Action Buttons Container */}
-          <div className="flex items-center gap-2">
-            {/* Open Listing Button */}
-            <Button
-              onClick={handleOpenListing}
-              variant="secondary"
-              size="sm"
-              className="text-xs font-medium px-3 py-1.5"
-            >
-              Open Listing
-            </Button>
-
-            {/* Add to Quote Button */}
-            <div
+          {canUseQuoteBuilder && isInQuoteBuilder ? (
+            <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                onRemoveFromQuote(inv.id);
               }}
+              className="h-8 px-3 rounded-md border border-destructive text-destructive hover:bg-destructive hover:text-white transition-all text-xs font-medium"
             >
-              <AddToCartButton
-                vehicleId={inv.id}
-                label="Add to Quote"
-                quantityOverride={1}
-                fullWidth={false}
-                size="sm"
-                isInQuoteBuilder={isInQuoteBuilder}
-                onAdded={() => onAdded?.(inv.id)}
-                sellerId={sellerId}
-                sellerCompany={sellerCompany}
-                storageItem={storageItem}
-              />
-            </div>
-          </div>
+              Remove
+            </button>
+          ) : canUseQuoteBuilder ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToQuote({ id: inv.id, storageItem });
+              }}
+              className="h-8 px-3 rounded-md bg-brand-blue text-white hover:opacity-90 transition-all text-xs font-medium"
+            >
+              Add to Quote Builder
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -347,7 +447,6 @@ export default function VehicleCardListing({
   totalItems,
   totalPages,
   pageSize,
-  cartInventoryIds,
 }: Readonly<PropsT>) {
   const lastRef = useRef(initialLast);
   const pageRef = useRef(typeof currentPage === "number" ? currentPage + 1 : 2);
@@ -356,117 +455,157 @@ export default function VehicleCardListing({
   const pageBaseRef = useRef<0 | 1>(1);
 
   const [items, setItems] = useState(initialData);
-  const [quoteIds, setQuoteIds] = useState<string[]>(cartInventoryIds ?? []);
   const [sortBy, setSortBy] = useState("sortBy=price&sortOrder=asc");
   const sortByRef = useRef("sortBy=price&sortOrder=asc");
 
   const [openBucketKey, setOpenBucketKey] = useState<string | null>(null);
+  const [isModalExpanded, setIsModalExpanded] = useState(false);
+  const [showBucketInfo, setShowBucketInfo] = useState(false);
   const prefetchedAllRef = useRef(false);
-  const quoteIdSet = useMemo(() => new Set(quoteIds), [quoteIds]);
-  const quoteStorageKey = "quoteBuilderIds";
   const quoteItemsStorageKey = "quoteBuilderItems";
+  const quoteStorageKey = "quoteBuilderIds";
+  const quoteSellerStorageKey = "quoteBuilderSellerByVehicle";
+  const quoteSellerCompanyStorageKey = "quoteBuilderSellerByCompany";
+  const quoteVehicleCompanyStorageKey = "quoteBuilderVehicleByCompany";
+  const [quoteIds, setQuoteIds] = useState<string[]>([]);
+  const quoteIdSet = useMemo(() => new Set(quoteIds), [quoteIds]);
+  const [isBuyer, setIsBuyer] = useState<boolean | null>(null);
+  const canUseQuoteBuilder = isBuyer === true;
+  const [modalSort, setModalSort] = useState<"price-asc" | "price-desc" | "mileage-asc" | "mileage-desc">(
+    "price-asc"
+  );
+  const modalSortOptions = [
+    { value: "price-asc", label: "Price: Low to High" },
+    { value: "price-desc", label: "Price: High to Low" },
+    { value: "mileage-asc", label: "Mileage: Low to High" },
+    { value: "mileage-desc", label: "Mileage: High to Low" },
+  ];
 
-  const addQuoteId = (id: string) => {
-    if (!id || quoteIdSet.has(id)) return;
-    setQuoteIds((prev) => {
-      const merged = Array.from(new Set([...prev, id]));
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(quoteStorageKey, JSON.stringify(merged));
-      }
-      return merged;
-    });
-  };
-
-  const addAllUnitsToQuote = () => {
-    if (!activeBucket || activeBucket.items.length === 0) return;
-
-    const itemsToAdd: Array<any> = [];
-
-    // Collect all storage items for bulk addition
-    for (const item of activeBucket.items) {
-      const inv = item.inventory as InventoryMaybeExtended;
-      const id = inv.id;
-
-      // Skip if already in quote
-      if (quoteIdSet.has(id)) continue;
-
-      const sellerId = item?.inventory?.userId || (item as any)?.user?.userId;
-      const sellerCompany =
-        item?.user?.roleMetaData?.companyName || item?.user?.roleMetaData?.dealershipName;
-
-      const storageItem = {
-        id: inv.id,
-        name: `${inv.brand ?? ""} ${inv.model ?? ""}`.trim(),
-        year: Number(inv.year) || 0,
-        location: `${inv.city ?? ""}${inv.country ? `, ${inv.country}` : ""}`.trim(),
-        quantity: 1,
-        price: Number(inv.price) || 0,
-        currency: inv.currency || "USD",
-        mainImageUrl: inv.mainImageUrl,
-        sellerCompany: sellerCompany || "Unknown Seller",
-        sellerId: sellerId,
-        bucketKey: buildBucketKey(inv),
-        isSelected: true,
-
-        // Individual vehicle fields for grouping and display
-        brand: safeStr(inv.brand) || undefined,
-        model: safeStr(inv.model) || undefined,
-        variant: safeStr(inv.variant) || undefined,
-        color: safeStr(inv.color) || undefined,
-        condition: safeStr(inv.condition) || undefined,
-        bodyType: safeStr(inv.bodyType) || undefined,
-      };
-
-      itemsToAdd.push(storageItem);
-      // Also update the quote IDs state
-      addQuoteId(inv.id);
-    }
-
-    // Update localStorage with full item details
-    if (itemsToAdd.length > 0 && typeof window !== "undefined") {
+  useEffect(() => {
+    let isActive = true;
+    const fetchRole = async () => {
       try {
-        const existing = window.localStorage.getItem(quoteItemsStorageKey);
-        const existingItems = existing ? (JSON.parse(existing) as Array<{ id: string }>) : [];
-
-        // Merge new items with existing, avoiding duplicates
-        const merged = [...existingItems];
-        for (const newItem of itemsToAdd) {
-          if (!merged.some((m) => m.id === newItem.id)) {
-            merged.push(newItem);
-          }
-        }
-
-        window.localStorage.setItem(quoteItemsStorageKey, JSON.stringify(merged));
-      } catch (err) {
-        console.error("Error updating quote builder items:", err);
+        const userData = await api.get<{ data?: { roleType?: string } }>("/api/v1/auth/getUserInfoByToken", {
+          isAuthRequired: false,
+        });
+        const role = userData.data?.roleType?.toLowerCase();
+        if (!isActive) return;
+        setIsBuyer(role === "buyer");
+      } catch {
+        if (!isActive) return;
+        setIsBuyer(false);
       }
-    }
-  };
+    };
+    fetchRole();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!canUseQuoteBuilder) {
+      setQuoteIds([]);
+      return;
+    }
     try {
       const rawItems = window.localStorage.getItem(quoteItemsStorageKey);
-      const parsedItems = rawItems ? (JSON.parse(rawItems) as Array<{ id: string }>) : [];
-      const localIds = parsedItems.map((i) => i.id).filter(Boolean);
-      const merged = Array.from(new Set([...(cartInventoryIds ?? []), ...localIds]));
-      setQuoteIds(merged);
-      window.localStorage.setItem(quoteStorageKey, JSON.stringify(merged));
+      const parsedItems = rawItems ? (JSON.parse(rawItems) as Array<{ id: string | number }>) : [];
+      const localIds = parsedItems.map((i) => normalizeId(i.id)).filter(Boolean);
+      setQuoteIds(localIds);
     } catch {}
-  }, [cartInventoryIds]);
+  }, [canUseQuoteBuilder]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== quoteStorageKey) return;
+    if (!canUseQuoteBuilder) return;
+    const onQuoteUpdate = () => {
       try {
-        const parsed = e.newValue ? (JSON.parse(e.newValue) as string[]) : [];
-        setQuoteIds(parsed);
+        const rawItems = window.localStorage.getItem(quoteItemsStorageKey);
+        const parsedItems = rawItems ? (JSON.parse(rawItems) as Array<{ id: string | number }>) : [];
+        const localIds = parsedItems.map((i) => normalizeId(i.id)).filter(Boolean);
+        setQuoteIds(localIds);
       } catch {}
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+    window.addEventListener("quoteBuilderUpdated", onQuoteUpdate);
+    return () => window.removeEventListener("quoteBuilderUpdated", onQuoteUpdate);
+  }, [canUseQuoteBuilder]);
+
+  const addQuoteLocal = (payload: {
+    id: string;
+    storageItem: {
+      id: string;
+      name: string;
+      year: number;
+      location: string;
+      quantity: number;
+      price: number;
+      currency: string;
+      mainImageUrl: string;
+      sellerCompany: string;
+      sellerId?: string;
+      bucketKey: string;
+      isSelected?: boolean;
+    };
+  }) => {
+    if (typeof window === "undefined") return;
+    if (!canUseQuoteBuilder) return;
+    try {
+      const rawItems = window.localStorage.getItem(quoteItemsStorageKey);
+      const parsedItems = rawItems ? (JSON.parse(rawItems) as any[]) : [];
+      const filtered = parsedItems.filter((i) => i?.id !== payload.storageItem.id);
+      filtered.push({ ...payload.storageItem, isSelected: payload.storageItem.isSelected ?? true });
+      window.localStorage.setItem(quoteItemsStorageKey, JSON.stringify(filtered));
+
+      const raw = window.localStorage.getItem(quoteStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+      const merged = Array.from(new Set([...parsed, payload.id]));
+      window.localStorage.setItem(quoteStorageKey, JSON.stringify(merged));
+
+      if (payload.storageItem.sellerId) {
+        const rawMap = window.localStorage.getItem(quoteSellerStorageKey);
+        const parsedMap = rawMap ? (JSON.parse(rawMap) as Record<string, string>) : {};
+        parsedMap[payload.id] = payload.storageItem.sellerId;
+        window.localStorage.setItem(quoteSellerStorageKey, JSON.stringify(parsedMap));
+      }
+      if (payload.storageItem.sellerCompany && payload.storageItem.sellerId) {
+        const rawCompanyMap = window.localStorage.getItem(quoteSellerCompanyStorageKey);
+        const parsedCompanyMap = rawCompanyMap ? (JSON.parse(rawCompanyMap) as Record<string, string>) : {};
+        parsedCompanyMap[payload.storageItem.sellerCompany] = payload.storageItem.sellerId;
+        window.localStorage.setItem(quoteSellerCompanyStorageKey, JSON.stringify(parsedCompanyMap));
+      }
+      if (payload.storageItem.sellerCompany) {
+        const rawVehicleCompanyMap = window.localStorage.getItem(quoteVehicleCompanyStorageKey);
+        const parsedVehicleCompanyMap = rawVehicleCompanyMap ? (JSON.parse(rawVehicleCompanyMap) as Record<string, string>) : {};
+        parsedVehicleCompanyMap[payload.storageItem.sellerCompany] = payload.id;
+        window.localStorage.setItem(quoteVehicleCompanyStorageKey, JSON.stringify(parsedVehicleCompanyMap));
+      }
+      window.dispatchEvent(new Event("quoteBuilderUpdated"));
+      setQuoteIds((prev) => Array.from(new Set([...prev, normalizeId(payload.id)])));
+    } catch {}
+  };
+
+  const removeQuoteLocal = (id: string) => {
+    if (typeof window === "undefined") return;
+    if (!canUseQuoteBuilder) return;
+    try {
+      const rawItems = window.localStorage.getItem(quoteItemsStorageKey);
+      const parsedItems = rawItems ? (JSON.parse(rawItems) as any[]) : [];
+      window.localStorage.setItem(
+        quoteItemsStorageKey,
+        JSON.stringify(parsedItems.filter((i) => i?.id !== id))
+      );
+      const raw = window.localStorage.getItem(quoteStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+      window.localStorage.setItem(quoteStorageKey, JSON.stringify(parsed.filter((x) => x !== id)));
+      const rawMap = window.localStorage.getItem(quoteSellerStorageKey);
+      const parsedMap = rawMap ? (JSON.parse(rawMap) as Record<string, string>) : {};
+      delete parsedMap[id];
+      window.localStorage.setItem(quoteSellerStorageKey, JSON.stringify(parsedMap));
+      window.dispatchEvent(new Event("quoteBuilderUpdated"));
+      setQuoteIds((prev) => prev.filter((x) => x !== normalizeId(id)));
+    } catch {}
+  };
 
   const getPaginatedData = async (page: number, sort: string = sortByRef.current, isScroll = true) => {
     try {
@@ -511,12 +650,6 @@ export default function VehicleCardListing({
       let seen = new Set<string>();
       let totalTarget: number | undefined;
 
-      const baseParams = {
-        ...querySearchParams,
-        sortBy: sort.split("&")[0]?.split("=")[1],
-        sortOrder: sort.split("&")[1]?.split("=")[1],
-      };
-
       const resetState = () => {
         all = [];
         page = 1;
@@ -529,6 +662,12 @@ export default function VehicleCardListing({
       while (!last && safety < 200 && candidateIndex < candidates.length) {
         const { key, base } = candidates[candidateIndex];
         const pageValue = String(page - (base === 0 ? 1 : 0));
+
+        const baseParams = {
+          ...querySearchParams,
+          sortBy: sort.split("&")[0]?.split("=")[1],
+          sortOrder: sort.split("&")[1]?.split("=")[1],
+        };
 
         const res = await clientSearch({
           ...baseParams,
@@ -655,22 +794,74 @@ export default function VehicleCardListing({
   const groupsCount = buckets.length;
 
   const activeBucket = openBucketKey ? buckets.find((b) => b.key === openBucketKey) : undefined;
+  const sortedBucketItems = useMemo(() => {
+    if (!activeBucket) return [];
+    const items = [...activeBucket.items];
+    const mileageValue = (it: Content) => {
+      const inv = it.inventory as InventoryMaybeExtended;
+      const inventoryData = (it as any)?.inventoryData ?? (inv as any)?.inventoryData;
+      const m = getMileage(inv, inventoryData);
+      return parseMileage(m ?? 0) ?? 0;
+    };
+    switch (modalSort) {
+      case "price-desc":
+        return items.sort((a, b) => (Number(b.inventory.price) || 0) - (Number(a.inventory.price) || 0));
+      case "mileage-asc":
+        return items.sort((a, b) => mileageValue(a) - mileageValue(b));
+      case "mileage-desc":
+        return items.sort((a, b) => mileageValue(b) - mileageValue(a));
+      case "price-asc":
+      default:
+        return items.sort((a, b) => (Number(a.inventory.price) || 0) - (Number(b.inventory.price) || 0));
+    }
+  }, [activeBucket, modalSort]);
 
   const priceRangeText = (b?: Bucket) => {
     if (!b) return "";
     const currency = b.currency ?? b.representative.inventory.currency;
-    if (b.minPrice === b.maxPrice) return formatPrice(String(Math.round(b.minPrice)), currency);
-    return `${formatPrice(String(Math.round(b.minPrice)), currency)} - ${formatPrice(String(Math.round(b.maxPrice)), currency)}`;
+    if (b.minPrice === b.maxPrice) return formatPriceNoDecimals(Math.round(b.minPrice), currency);
+    return `${formatPriceNoDecimals(Math.round(b.minPrice), currency)} - ${formatPriceNoDecimals(Math.round(b.maxPrice), currency)}`;
+  };
+  const mileageRangeText = (b?: Bucket) => {
+    if (!b || b.minMileage === undefined || b.maxMileage === undefined) return "";
+    if (b.minMileage === b.maxMileage) return `${Math.round(b.minMileage)} km`;
+    return `${Math.round(b.minMileage)} - ${Math.round(b.maxMileage)} km`;
   };
 
   return (
     <>
       {/* Top text */}
       <div className="flex items-center justify-between gap-4 mb-6 mt-8">
-        <span className="text-sm text-[#4d4f53]">
-          <span className="font-semibold text-black">Showing {totalItems} vehicles</span>{" "}
-          <span className="text-[#4d4f53]">(in {groupsCount} groups)</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-[#4d4f53]">
+            <span className="font-semibold text-black">Showing {totalItems} vehicles</span>{" "}
+            <span className="text-[#4d4f53]">(in {groupsCount} groups)</span>
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowBucketInfo((prev) => !prev)}
+              className="h-6 w-6 rounded-full border border-stroke-light text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              aria-label="Bucket info"
+            >
+              i
+            </button>
+            {showBucketInfo ? (
+              <div className="absolute left-0 mt-2 w-64 rounded-xl border border-stroke-light bg-white shadow-sm p-3 text-xs text-[#4d4f53] z-10">
+                <div className="font-semibold text-black mb-2">Buckets are based on:</div>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>Brand</li>
+                  <li>Model</li>
+                  <li>Variant</li>
+                  <li>Color</li>
+                  <li>Year</li>
+                  <li>Condition</li>
+                  <li>Body Type</li>
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         {/* Remove "Showing X vehicles" from inside SortedBy.tsx if it exists */}
         <div className="w-52">
@@ -680,147 +871,216 @@ export default function VehicleCardListing({
 
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {buckets.map((bucket) => (
-          <VehicleCard
-            key={bucket.key}
-            item={bucket.representative}
-            bucketCount={bucket.count}
-            bucketVariant={bucket.variant}
-            bucketPriceRange={{
-              min: bucket.minPrice,
-              max: bucket.maxPrice,
-              currency: bucket.currency ?? bucket.representative.inventory.currency,
-            }}
-            viewAllLabel={bucket.count > 1 ? `View all ${bucket.count} units` : "View details"}
-            onViewAllClick={() => setOpenBucketKey(bucket.key)}
-            isInQuoteBuilder={bucket.items.some((it) => quoteIdSet.has(it.inventory.id))}
-          />
-        ))}
+        {buckets.map((bucket) => {
+          const bucketAddedCount = canUseQuoteBuilder
+            ? bucket.items.reduce(
+                (acc, it) => (quoteIdSet.has(normalizeId(it.inventory.id)) ? acc + 1 : acc),
+                0
+              )
+            : 0;
+          return (
+            <VehicleCard
+              key={bucket.key}
+              item={bucket.representative}
+              bucketCount={bucket.count}
+              bucketAddedCount={bucketAddedCount}
+              bucketVariant={bucket.variant}
+              bucketPriceRange={{
+                min: bucket.minPrice,
+                max: bucket.maxPrice,
+                currency: bucket.currency ?? bucket.representative.inventory.currency,
+              }}
+              viewAllLabel={bucket.count > 1 ? `View all ${bucket.count} units` : "View details"}
+              onViewAllClick={() => setOpenBucketKey(bucket.key)}
+            />
+          );
+        })}
       </div>
 
-      {/* Right-side modal (matching Figma design) */}
+      {/* Right-side modal (matching card styling inside) */}
       <SlideOver
         isOpen={!!openBucketKey}
-        onClose={() => setOpenBucketKey(null)}
+        title={
+          activeBucket
+            ? `${activeBucket.year ?? ""} ${activeBucket.brand ?? ""} ${activeBucket.model ?? ""}`.trim()
+            : "Vehicle Group"
+        }
+        onClose={() => {
+          setOpenBucketKey(null);
+          setIsModalExpanded(false);
+        }}
+        isExpanded={isModalExpanded}
+        onToggleExpand={() => setIsModalExpanded((prev) => !prev)}
       >
         {activeBucket ? (
-          <div className="flex flex-col h-full bg-white">
-            {/* Scrollable content area */}
-            <div className="flex-1 overflow-auto">
-              {/* TOP SECTION: Badges, Title, Subtitle, Info Pills */}
-              <div className="px-6 pt-4 pb-5 border-b border-gray-100">
-                {/* Badges row */}
-                <div className="flex items-center gap-2.5 flex-wrap mb-2">
-                  <span className="inline-flex items-center justify-center rounded-full px-3.5 py-1.5 text-xs font-semibold bg-brand-blue text-white">
-                    Inventory Group
+          <div className="p-5 space-y-5">
+            {/* Header styled like an expanded card */}
+            <div className="text-foreground flex flex-col w-full bg-white rounded-xl shadow-sm overflow-hidden border border-stroke-light">
+              {/* Image block like card top */}
+              <div className="relative h-48 bg-gray-100 rounded-t-xl overflow-hidden">
+                <Image
+                  src={(activeBucket.representative.inventory as InventoryMaybeExtended)?.mainImageUrl}
+                  alt={`${activeBucket.brand ?? ""} ${activeBucket.model ?? ""}`}
+                  fill={true}
+                  height={168}
+                  width={260}
+                  className="w-full object-cover"
+                />
+
+                <div className="absolute top-3 left-3">
+                  <span className="inline-flex items-center justify-center font-medium text-white text-[10px] px-2 py-1 rounded-md bg-brand-blue">
+                    Verified Dealer
                   </span>
-                  {activeBucket.condition ? (
-                    <span className="inline-flex items-center justify-center rounded-full px-3.5 py-1.5 text-xs font-medium bg-gray-200 text-gray-700">
-                      {activeBucket.condition}
-                    </span>
-                  ) : null}
                 </div>
 
-                {/* Title */}
-                <h2 className="text-xl font-bold text-gray-900 mb-1 leading-snug">
-                  {activeBucket.year} {activeBucket.brand} {activeBucket.model}
-                </h2>
-
-                {/* Subtitle */}
-                <p className="text-xs text-gray-600 mb-2.5">
-                  {activeBucket.variant || "—"} {activeBucket.bodyType ? `• ${activeBucket.bodyType}` : ""}
-                </p>
-
-                {/* Info Pills: Color, Dealer, Location */}
-                <div className="flex items-center gap-4 flex-wrap text-xs">
-                  {activeBucket.color ? (
-                    <div className="flex items-center text-gray-700 gap-1.5">
-                      <span className="inline-block w-2.5 h-2.5 rounded-full border border-gray-300" style={{ backgroundColor: activeBucket.color.toLowerCase() === "white" ? "#f3f4f6" : activeBucket.color.toLowerCase() }}></span>
-                      <span className="font-medium">{activeBucket.color}</span>
-                    </div>
-                  ) : null}
-                  <div className="flex items-center text-gray-700 font-medium gap-1">
-                    <span className="text-sm">🏢</span>
-                    <span>
-                      {activeBucket.representative.user?.roleMetaData?.companyName ||
-                        activeBucket.representative.user?.roleMetaData?.dealershipName ||
-                        "Dealer"}
+                {activeBucket.condition ? (
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center justify-center font-medium bg-white text-gray-700 text-[10px] px-2 py-1 rounded-md">
+                      {activeBucket.condition}
                     </span>
                   </div>
-                  <div className="flex items-center text-gray-700 font-medium gap-1">
-                    <MapPinIcon className="h-3.5 w-3.5 text-gray-600" />
+                ) : null}
+
+                <div className="absolute bottom-3 left-3 flex items-center bg-black/70 text-white text-xs px-2 py-1 rounded-md">
+                  <EyeIcon className="h-3 w-3 mr-1" />
+                  <span className="text-[10px]">{0} viewing</span>
+                </div>
+
+                {/* Favorite button moved to unit cards */}
+              </div>
+
+              {/* Expanded common details */}
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-base font-medium text-gray-900 truncate">
+                      {activeBucket.year} {activeBucket.brand} {activeBucket.model}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500 line-clamp-2">
+                      {activeBucket.bodyType || "—"} &bull; {activeBucket.variant || "—"}
+                      {activeBucket.color ? ` &bull; ${activeBucket.color}` : ""}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <div className="text-lg font-semibold flex gap-1 items-center text-gray-900 whitespace-nowrap leading-none">
+                      {priceRangeText(activeBucket)} <PriceBadge />
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">Price range</div>
+                    <div className="text-xs text-gray-600 mt-2">
+                      Mileage range: {mileageRangeText(activeBucket) || "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {activeBucket.color ? <CommonPill label={`Color: ${activeBucket.color}`} /> : null}
+                  {activeBucket.condition ? <CommonPill label={`Grade: ${activeBucket.condition}`} /> : null}
+                  {activeBucket.year ? <CommonPill label={`Year: ${activeBucket.year}`} /> : null}
+                  {activeBucket.bodyType ? <CommonPill label={`Body: ${activeBucket.bodyType}`} /> : null}
+                  {mileageRangeText(activeBucket) ? <CommonPill label={`Mileage: ${mileageRangeText(activeBucket)}`} /> : null}
+                </div>
+
+                {/* Location + share (same as card bottom) */}
+                <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center">
+                    <MapPinIcon className="h-3.5 w-3.5 mr-1" />
                     <span>
                       {activeBucket.representative.inventory?.city}, {activeBucket.representative.inventory?.country}
                     </span>
                   </div>
-                </div>
-              </div>
-
-              {/* SUMMARY SECTION: Single card with proper spacing */}
-              <div className="px-6 py-4 border-b border-gray-100">
-                <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg border border-gray-200 px-5 py-4">
-                  <div className="flex items-center justify-between gap-6">
-                    {/* Left: Total Units & Price Range Container */}
-                    <div className="flex items-center flex-1 gap-7">
-                      {/* Total Units */}
-                      <div className="flex flex-col">
-                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1.5">Total Units</div>
-                        <div className="text-4xl font-bold text-gray-900 leading-none">{activeBucket.count}</div>
-                        <div className="text-xs text-gray-500 mt-1.5 font-medium">Available</div>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="h-16 w-px bg-gray-300"></div>
-
-                      {/* Price Range */}
-                      <div className="flex flex-col">
-                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1.5">Price Range</div>
-                        <div className="text-base font-bold text-gray-900 flex items-center gap-1.5">
-                          {priceRangeText(activeBucket)}
-                          <PriceBadge />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: ADD ALL BUTTON */}
-                    <Button
-                      size="lg"
-                      className="bg-brand-blue hover:bg-brand-blue/90 text-white font-semibold px-5 py-2.5 rounded-lg shrink-0 whitespace-nowrap text-xs disabled:opacity-60"
-                      onClick={addAllUnitsToQuote}
-                      disabled={activeBucket.items.every((item) => quoteIdSet.has(item.inventory.id))}
-                    >
-                      + Add All {activeBucket.count}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* INDIVIDUAL UNITS SECTION */}
-              <div className="px-6 py-4">
-                {/* Section Heading */}
-                <div className="mb-4">
-                  <div className="text-xs font-bold text-gray-600 uppercase tracking-widest">
-                    Individual Units
-                  </div>
+                  <QRShare
+                    vehicleUrl={`/vehicles/${activeBucket.representative.inventory?.id}`}
+                    btnCls="h-auto"
+                    iconCls="w-4 h-4 text-brand-blue"
+                  />
                 </div>
 
-                {/* UNIT CARDS LIST */}
-                <div className="space-y-3">
-                  {activeBucket.items.map((it) => (
-                    <UnitCardRow
-                      key={it.inventory.id}
-                      item={it}
-                      isInQuoteBuilder={quoteIdSet.has(it.inventory.id)}
-                      onAdded={(id) => addQuoteId(id)}
-                    />
-                  ))}
+                {/* Seller line (same as card) */}
+                <div className="text-sm text-gray-500 mt-1">
+                  By{" "}
+                  <Link
+                    href={`/seller-details/${activeBucket.representative.inventory?.userId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-brand-blue hover:underline font-medium"
+                  >
+                    {activeBucket.representative.user?.roleMetaData?.companyName ||
+                      activeBucket.representative.user?.roleMetaData?.dealershipName}
+                  </Link>
                 </div>
+
+                {/* Inspection report button removed from header */}
               </div>
             </div>
 
-            {/* BOTTOM: Showing X units (Sticky Footer) */}
-            <div className="border-t border-gray-200 bg-white px-6 py-3 text-xs text-gray-600 font-medium sticky bottom-0">
-              Showing {activeBucket.count} units
+            {/* Units list */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-gray-900">
+                  Units in this bucket ({activeBucket.count})
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-44">
+                    <Select
+                      options={modalSortOptions}
+                      value={modalSort}
+                      onChange={(value) =>
+                        setModalSort(value as "price-asc" | "price-desc" | "mileage-asc" | "mileage-desc")
+                      }
+                      placeholder="Sort by"
+                      border="bg-input-background"
+                      cls="w-full"
+                    />
+                  </div>
+                  {canUseQuoteBuilder ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        activeBucket.items.forEach((it) => {
+                        if (!quoteIdSet.has(normalizeId(it.inventory.id))) {
+                            const inv = it.inventory as InventoryMaybeExtended;
+                            const sellerId = it?.inventory?.userId || (it as any)?.user?.userId;
+                            const sellerCompany =
+                              it?.user?.roleMetaData?.companyName || it?.user?.roleMetaData?.dealershipName;
+                            addQuoteLocal({
+                              id: inv.id,
+                              storageItem: {
+                                id: inv.id,
+                                name: `${inv.brand ?? ""} ${inv.model ?? ""}`.trim(),
+                                year: Number(inv.year) || 0,
+                                location: `${inv.city ?? ""}${inv.country ? `, ${inv.country}` : ""}`.trim(),
+                                quantity: 1,
+                                price: Number(inv.price) || 0,
+                                currency: inv.currency || "USD",
+                                mainImageUrl: inv.mainImageUrl,
+                                sellerCompany: sellerCompany || "Unknown Seller",
+                                sellerId: sellerId,
+                                bucketKey: buildBucketKey(inv),
+                                isSelected: true,
+                              },
+                            });
+                          }
+                        });
+                      }}
+                    disabled={activeBucket.items.every((it) => quoteIdSet.has(normalizeId(it.inventory.id)))}
+                      className="h-8 px-3 rounded-md bg-brand-blue text-white hover:opacity-90 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Add all to Quote Builder
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {sortedBucketItems.map((it) => (
+                <UnitCardRow
+                  key={it.inventory.id}
+                  item={it}
+                  isInQuoteBuilder={canUseQuoteBuilder && quoteIdSet.has(normalizeId(it.inventory.id))}
+                  canUseQuoteBuilder={canUseQuoteBuilder}
+                  onAddToQuote={addQuoteLocal}
+                  onRemoveFromQuote={removeQuoteLocal}
+                />
+              ))}
             </div>
           </div>
         ) : null}

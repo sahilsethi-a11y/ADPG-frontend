@@ -9,6 +9,8 @@ const sortOptions = [
         label: "Price: Low to High",
     },
     { value: "sortBy=price&sortOrder=desc", label: "Price: High to Low" },
+    { value: "sortBy=mileage&sortOrder=asc", label: "Mileage: Low to High" },
+    { value: "sortBy=mileage&sortOrder=desc", label: "Mileage: High to Low" },
     {
         value: "sortBy=year&sortOrder=desc",
         label: "Year: Newest First",
