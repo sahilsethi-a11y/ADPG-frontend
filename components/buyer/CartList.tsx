@@ -367,6 +367,14 @@ const NegotiationOrderCard = ({
             currency: string;
             discountPercent: number;
             total: number;
+            mainImageUrl?: string;
+            brand?: string;
+            model?: string;
+            variant?: string;
+            color?: string;
+            year?: number;
+            condition?: string;
+            bodyType?: string;
         }>;
         totals: {
             total: number;

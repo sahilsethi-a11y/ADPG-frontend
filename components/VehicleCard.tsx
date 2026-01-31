@@ -23,9 +23,25 @@ type Props = Readonly<{
     // Bucket modal trigger button
     viewAllLabel?: string;
     onViewAllClick?: () => void;
+
+    // Quote builder button
+    showQuoteButton?: boolean;
+    isInQuoteBuilder?: boolean;
+    onAddToQuote?: () => void;
 }>;
 
-export default function VehicleCard({ item, bucketCount, bucketVariant, bucketPriceRange, viewAllLabel, onViewAllClick }: Props) {
+export default function VehicleCard({
+    item,
+    bucketCount,
+    bucketAddedCount,
+    bucketVariant,
+    bucketPriceRange,
+    viewAllLabel,
+    onViewAllClick,
+    showQuoteButton,
+    isInQuoteBuilder,
+    onAddToQuote,
+}: Props) {
     const router = useRouter();
     const formatPriceNoDecimals = (value: number | string, currency = "USD") =>
         new Intl.NumberFormat("en-US", {
@@ -166,6 +182,21 @@ export default function VehicleCard({ item, bucketCount, bucketVariant, bucketPr
                             }}
                         >
                             {viewAllLabel}
+                        </Button>
+                    ) : null}
+
+                    {showQuoteButton ? (
+                        <Button
+                            variant="outline"
+                            size="md"
+                            fullWidth={true}
+                            disabled={isInQuoteBuilder}
+                            onClick={(e: any) => {
+                                e.stopPropagation();
+                                onAddToQuote?.();
+                            }}
+                        >
+                            {isInQuoteBuilder ? "In Quote Builder" : "Add to Quote Builder"}
                         </Button>
                     ) : null}
 

@@ -23,13 +23,16 @@ export default function Image({ height, width, fill = false, ...props }: Readonl
     const placeholder = props.preload || !hasDimensions || fill
         ? "empty"
         : `data:image/svg+xml;base64,${toBase64(shimmer(width, height))}`;
+    const placeholderValue = placeholder === "empty" ? "empty" : "blur";
+    const blurDataURL = placeholder === "empty" ? undefined : placeholder;
 
     return (
         <NextImage
             {...props}
             fill={fill}
             {...(!fill && hasDimensions ? { height, width } : {})}
-            placeholder={placeholder}
+            placeholder={placeholderValue}
+            blurDataURL={blurDataURL}
         />
     );
 }

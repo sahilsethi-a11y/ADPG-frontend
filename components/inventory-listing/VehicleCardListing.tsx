@@ -24,6 +24,7 @@ type PropsT = {
   totalItems: number;
   totalPages: number;
   pageSize: number;
+  cartInventoryIds?: string[];
 };
 
 type InventoryMaybeExtended = Content["inventory"] & {
@@ -708,6 +709,11 @@ export default function VehicleCardListing({
       pageBaseRef.current = finalCandidate.base;
 
       const resolvedTotalPages = Number.isFinite(totalPages) && totalPages > 1 ? totalPages : undefined;
+      const baseParams = {
+        ...querySearchParams,
+        sortBy: sort.split("&")[0]?.split("=")[1],
+        sortOrder: sort.split("&")[1]?.split("=")[1],
+      };
       if (resolvedTotalPages) {
         const seenAll = new Set<string>();
         const merged: Content[] = [];
@@ -1037,7 +1043,7 @@ export default function VehicleCardListing({
                       type="button"
                       onClick={() => {
                         activeBucket.items.forEach((it) => {
-                        if (!quoteIdSet.has(normalizeId(it.inventory.id))) {
+                          if (!quoteIdSet.has(normalizeId(it.inventory.id))) {
                             const inv = it.inventory as InventoryMaybeExtended;
                             const sellerId = it?.inventory?.userId || (it as any)?.user?.userId;
                             const sellerCompany =
@@ -1062,7 +1068,7 @@ export default function VehicleCardListing({
                           }
                         });
                       }}
-                    disabled={activeBucket.items.every((it) => quoteIdSet.has(normalizeId(it.inventory.id)))}
+                      disabled={activeBucket.items.every((it) => quoteIdSet.has(normalizeId(it.inventory.id)))}
                       className="h-8 px-3 rounded-md bg-brand-blue text-white hover:opacity-90 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Add all to Quote Builder

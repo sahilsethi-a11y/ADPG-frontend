@@ -67,10 +67,17 @@ export async function POST(request: Request) {
         for (const item of items) {
             const conversationId = item?.conversationId as string | undefined;
             if (!conversationId) continue;
+            const existing =
+                typeof (next as Record<string, unknown>)[conversationId] === "object" &&
+                (next as Record<string, unknown>)[conversationId] !== null
+                    ? (next as Record<string, unknown>)[conversationId]
+                    : {};
+            const existingStartedAt =
+                (existing as Record<string, unknown>)?.startedAt || new Date().toISOString();
             next[conversationId] = {
-                ...(next as Record<string, unknown>)[conversationId],
+                ...(existing as Record<string, unknown>),
                 ...item,
-                startedAt: (next as Record<string, any>)[conversationId]?.startedAt ?? new Date().toISOString(),
+                startedAt: existingStartedAt,
                 updatedAt: new Date().toISOString(),
             };
         }
