@@ -19,5 +19,17 @@ const shimmer = (w?: number | `${number}`, h?: number | `${number}`) => `
 const toBase64 = (str: string) => (globalThis.window === undefined ? Buffer.from(str).toString("base64") : globalThis.window.btoa(str));
 
 export default function Image({ height, width, fill = false, ...props }: Readonly<PropsT>) {
-    return <NextImage {...props} fill={fill} {...(!fill && { height, width })} placeholder={props.preload ? "empty" : `data:image/svg+xml;base64,${toBase64(shimmer(width, height))}`} />;
+    const hasDimensions = typeof width === "number" && typeof height === "number";
+    const placeholder = props.preload || !hasDimensions || fill
+        ? "empty"
+        : `data:image/svg+xml;base64,${toBase64(shimmer(width, height))}`;
+
+    return (
+        <NextImage
+            {...props}
+            fill={fill}
+            {...(!fill && hasDimensions ? { height, width } : {})}
+            placeholder={placeholder}
+        />
+    );
 }

@@ -28,7 +28,21 @@ export default function NegotiatePriceButton({ vehicleId, peerId }: Readonly<{ v
             const userData = await api.get<{ data: User }>("/api/v1/auth/getUserInfoByToken");
 
             if (userData.data?.roleType?.toLocaleLowerCase() === "buyer") {
-                router.push(`/my-negotiations/${userData.data.userId}_${peerId}_${vehicleId}`);
+                const conversationId = `${userData.data.userId}_${peerId}_${vehicleId}`;
+                fetch("/api/negotiation-index", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        item: {
+                            conversationId,
+                            buyerId: userData.data.userId,
+                            sellerId: peerId,
+                            itemId: vehicleId,
+                            roleType: "buyer",
+                        },
+                    }),
+                }).catch(() => {});
+                router.push(`/my-negotiations/${conversationId}`);
             } else {
                 message.info("Only buyers can negotiate the price.");
                 setDisabled(true);

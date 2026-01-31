@@ -20,6 +20,7 @@ type Bucket = {
     currency: string;
     totalUnits: number;
     bucketTotal: number;
+    mainImageUrl?: string;
 };
 
 const quoteItemsStorageKey = "quoteBuilderItems";
@@ -47,6 +48,7 @@ const groupBuckets = (list: QuoteItem[]): Bucket[] => {
                 currency: item.currency,
                 totalUnits: item.quantity,
                 bucketTotal: item.quantity * item.price,
+                mainImageUrl: item.mainImageUrl,
             });
         } else {
             existing.totalUnits += item.quantity;
@@ -65,6 +67,7 @@ type Props = {
     onDownpaymentChange: (value: number) => void;
     selectedPort: string;
     onPortChange: (value: string) => void;
+    conversationId?: string;
     // Submit handler
     onSubmit?: (proposalData: {
         discountPercent: number;
@@ -80,6 +83,17 @@ type Props = {
             name: string;
             total: number;
             discountPercent: number;
+            totalUnits: number;
+            unitPrice: number;
+            currency: string;
+            brand?: string;
+            model?: string;
+            variant?: string;
+            color?: string;
+            year?: number;
+            condition?: string;
+            bodyType?: string;
+            mainImageUrl?: string;
         }>;
     }) => Promise<void>;
     isSubmitting?: boolean;
@@ -95,6 +109,7 @@ export default function NegotiationQuotePanelLocal({
     onDownpaymentChange,
     selectedPort,
     onPortChange,
+    conversationId,
     onSubmit,
     isSubmitting,
     submissionError,
@@ -104,7 +119,10 @@ export default function NegotiationQuotePanelLocal({
     useEffect(() => {
         if (typeof window === "undefined") return;
         try {
-            const raw = window.localStorage.getItem(quoteItemsStorageKey);
+            const scopedKey = conversationId ? `negotiationItems_${conversationId}` : "";
+            const raw =
+                (scopedKey && window.localStorage.getItem(scopedKey)) ||
+                window.localStorage.getItem(quoteItemsStorageKey);
             const parsed = raw ? (JSON.parse(raw) as QuoteItem[]) : [];
             setItems(parsed);
         } catch {
@@ -196,6 +214,17 @@ export default function NegotiationQuotePanelLocal({
                 name: b.name,
                 total: b.bucketTotal,
                 discountPercent: bucketDiscounts[b.key] ?? 0,
+                totalUnits: b.totalUnits,
+                unitPrice: b.unitPrice,
+                currency: b.currency,
+                brand: b.brand,
+                model: b.model,
+                variant: b.variant,
+                color: b.color,
+                year: b.year,
+                condition: b.condition,
+                bodyType: b.bodyType,
+                mainImageUrl: b.mainImageUrl,
             })),
         });
     };

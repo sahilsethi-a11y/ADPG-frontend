@@ -28,9 +28,11 @@ type Props = {
   sellerName?: string;
   sellerId?: string;
   isBuyer?: boolean;
+  canEditDiscounts?: boolean;
   bucketDiscounts: Record<string, number>;
   onBucketDiscountChange: (bucketKey: string, value: number) => void;
   isLocked?: boolean;
+  conversationId?: string;
 };
 
 // Bucket grouping function - groups items by their pre-computed bucketKey
@@ -76,9 +78,11 @@ export default function NegotiationItemsSection({
   sellerName,
   sellerId,
   isBuyer,
+  canEditDiscounts,
   bucketDiscounts,
   onBucketDiscountChange,
   isLocked,
+  conversationId,
 }: Props) {
   const [items, setItems] = useState<QuoteItem[]>([]);
 
@@ -88,7 +92,10 @@ export default function NegotiationItemsSection({
 
     const loadItems = () => {
       try {
-        const raw = window.localStorage.getItem("quoteBuilderItems");
+        const scopedKey = conversationId ? `negotiationItems_${conversationId}` : "";
+        const raw =
+          (scopedKey && window.localStorage.getItem(scopedKey)) ||
+          window.localStorage.getItem("quoteBuilderItems");
         const parsed = raw ? (JSON.parse(raw) as QuoteItem[]) : [];
         setItems(parsed);
       } catch {
@@ -100,7 +107,7 @@ export default function NegotiationItemsSection({
 
     // Listen to storage changes from other tabs
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "quoteBuilderItems") {
+      if (e.key === "quoteBuilderItems" || e.key === (conversationId ? `negotiationItems_${conversationId}` : "")) {
         loadItems();
       }
     };
@@ -145,7 +152,7 @@ export default function NegotiationItemsSection({
             key={bucket.key}
             bucket={bucket}
             discountPercent={bucketDiscounts[bucket.key] ?? 0}
-            showDiscountControls={isBuyer === true}
+            showDiscountControls={canEditDiscounts ?? isBuyer === true}
             onDiscountChange={(value) => onBucketDiscountChange(bucket.key, value)}
             isLocked={isLocked}
           />

@@ -6,7 +6,9 @@
     "dev": "next dev --experimental-https",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "jsonbin:create": "node scripts/create-jsonbin.js",
+    "jsonbin:test": "node scripts/jsonbin-test.js"
   },
   "dependencies": {
     "@next/third-parties": "16.1.0",

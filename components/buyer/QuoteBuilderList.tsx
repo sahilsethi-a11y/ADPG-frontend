@@ -187,6 +187,10 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
         persistItems(next);
     };
 
+    const handleRemoveAll = () => {
+        persistItems([]);
+    };
+
 
     if (items?.length < 1) {
         return (
@@ -199,6 +203,11 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
     return (
         <div className="flex justify-center">
             <div className="w-full max-w-5xl space-y-6">
+                <div className="flex items-center justify-end">
+                    <Button onClick={handleRemoveAll} size="sm" variant="outline">
+                        Remove all
+                    </Button>
+                </div>
                 {grouped.map((seller) => (
                     <div key={seller.sellerCompany} className="space-y-4 border border-stroke-light/70 rounded-xl p-3">
                         <div className="flex items-center justify-between">

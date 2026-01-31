@@ -1,4 +1,5 @@
-import CartList, { type Cart } from "@/components/buyer/CartList";
+import CartPageClient from "@/components/buyer/CartPageClient";
+import { type Cart } from "@/components/buyer/CartList";
 import { api } from "@/lib/api/server-request";
 
 export default async function MyCart() {
@@ -9,7 +10,7 @@ export default async function MyCart() {
             <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl text-brand-blue">My Cart</h1>
             </div>
-            <CartList list={res.data ?? []} />
+            <CartPageClient list={res.data ?? []} />
         </main>
     );
 }

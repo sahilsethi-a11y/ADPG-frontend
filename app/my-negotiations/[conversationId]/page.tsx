@@ -77,6 +77,7 @@ export default async function MyConversation({
                     userId={userId}
                     role={userData.data?.roleType}
                     conversationId={conversationId}
+                    vehicleId={vehicle?.id}
                 />
             </div>
         </main>
