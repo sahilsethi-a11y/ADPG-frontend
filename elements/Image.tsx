@@ -25,6 +25,7 @@ export default function Image({ height, width, fill = false, ...props }: Readonl
         : `data:image/svg+xml;base64,${toBase64(shimmer(width, height))}`;
     const placeholderValue = placeholder === "empty" ? "empty" : "blur";
     const blurDataURL = placeholder === "empty" ? undefined : placeholder;
+    const loading = props.loading ?? (props.priority || props.preload ? undefined : "lazy");
 
     return (
         <NextImage
@@ -33,6 +34,7 @@ export default function Image({ height, width, fill = false, ...props }: Readonl
             {...(!fill && hasDimensions ? { height, width } : {})}
             placeholder={placeholderValue}
             blurDataURL={blurDataURL}
+            loading={loading}
         />
     );
 }

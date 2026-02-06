@@ -83,9 +83,18 @@ export const getDaysBetween = (date1: string | Date, date2: string | Date): numb
     return Math.round(diffMs / (1000 * 60 * 60 * 24));
 };
 
-export const formatPrice = (price: number | string, currency = "USD") => {
-    return new Intl.NumberFormat(currencyLocaleMap[currency] || "en-US", {
-        style: "currency",
-        currency,
-    }).format(+price);
+export const formatPrice = (price: number | string, currency: string = "USD") => {
+    const safeCurrency =
+        typeof currency === "string" && currency.trim().length === 3 ? currency.trim().toUpperCase() : "USD";
+    try {
+        return new Intl.NumberFormat(currencyLocaleMap[safeCurrency] || "en-US", {
+            style: "currency",
+            currency: safeCurrency,
+        }).format(+price);
+    } catch {
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+        }).format(+price);
+    }
 };

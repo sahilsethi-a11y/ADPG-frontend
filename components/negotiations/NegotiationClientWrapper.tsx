@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import NegotiationItemsSection from "./NegotiationItemsSection";
-import NegotiationQuotePanelLocal from "./NegotiationQuotePanelLocal";
+import NegotiationQuotePanelLocal, { PORT_OPTIONS } from "./NegotiationQuotePanelLocal";
 import Conversation, { NegotiationInfo, type Message } from "./Conversation";
 import YourProposalSummary from "./YourProposalSummary";
 import Button from "@/elements/Button";
@@ -23,6 +23,7 @@ type Props = {
     role?: string;
     conversationId: string;
     vehicleId?: string;
+    enableRoleToggle?: boolean;
 };
 
 // Type for submitted proposal
@@ -72,6 +73,7 @@ export default function NegotiationClientWrapper({
     role,
     conversationId,
     vehicleId,
+    enableRoleToggle,
 }: Props) {
     const router = useRouter();
     // ==========================================
@@ -79,7 +81,7 @@ export default function NegotiationClientWrapper({
     // ==========================================
     const [bucketDiscounts, setBucketDiscounts] = useState<Record<string, number>>({});
     const [downpaymentPercent, setDownpaymentPercent] = useState(10);
-    const [selectedPort, setSelectedPort] = useState("Dubai");
+    const [selectedPort, setSelectedPort] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionError, setSubmissionError] = useState<string | null>(null);
 
@@ -97,8 +99,11 @@ export default function NegotiationClientWrapper({
     // ==========================================
     // Submit Proposal Handler
     // ==========================================
-    const isBuyer = role?.toLowerCase() === "buyer";
-    const isSeller = role?.toLowerCase() === "seller";
+    const [demoRole, setDemoRole] = useState<string | undefined>(role);
+    const [isRoleToggleEnabled, setIsRoleToggleEnabled] = useState(false);
+    const effectiveRole = enableRoleToggle && isRoleToggleEnabled ? demoRole : role;
+    const isBuyer = effectiveRole?.toLowerCase() === "buyer";
+    const isSeller = effectiveRole?.toLowerCase() === "seller";
     const canEditDiscounts = isBuyer || isCountering;
 
     const setStateFromProposal = useCallback((proposal: ActiveProposal) => {
@@ -113,15 +118,21 @@ export default function NegotiationClientWrapper({
 
     const saveProposal = useCallback(
         async (proposal: ActiveProposal) => {
-            const res = await fetch("/api/negotiation-proposals", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    conversationId,
-                    proposal,
-                }),
-            });
-            return res.ok;
+            try {
+                const res = await fetch("/api/negotiation-proposals", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        conversationId,
+                        proposal,
+                    }),
+                });
+                if (res.ok) return { ok: true as const };
+                const text = await res.text();
+                return { ok: false as const, error: text || res.statusText };
+            } catch (err) {
+                return { ok: false as const, error: (err as Error).message || "Network error" };
+            }
         },
         [conversationId]
     );
@@ -193,9 +204,9 @@ export default function NegotiationClientWrapper({
                     }),
                 }).catch(() => {});
 
-                const ok = await saveProposal(proposal);
-                if (!ok) {
-                    setSubmissionError("Failed to submit proposal. Please try again.");
+                const result = await saveProposal(proposal);
+                if (!result.ok) {
+                    setSubmissionError(`Failed to submit proposal. ${result.error || "Please try again."}`);
                     setUiStatus("IDLE");
                     setActiveProposal(null);
                     setIsSubmitting(false);
@@ -225,7 +236,7 @@ export default function NegotiationClientWrapper({
                 setIsSubmitting(false);
             }
         },
-        [activeProposal, isBuyer, saveProposal, selectedPort]
+        [activeProposal, isBuyer, saveProposal, selectedPort, effectiveRole, sellerId, userId, vehicleId]
     );
 
     useEffect(() => {
@@ -253,6 +264,43 @@ export default function NegotiationClientWrapper({
             window.clearInterval(interval);
         };
     }, [conversationId]);
+
+    useEffect(() => {
+        if (!selectedPort) {
+            setSelectedPort(PORT_OPTIONS[0]);
+        }
+    }, [selectedPort]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (!isSeller || !activeProposal || !conversationId) return;
+        if (!activeProposal.bucketSummaries || activeProposal.bucketSummaries.length === 0) return;
+        try {
+            const items = activeProposal.bucketSummaries.map((b) => ({
+                id: `${conversationId}_${b.key}`,
+                name: b.name,
+                year: b.year ?? 0,
+                location: "",
+                quantity: b.totalUnits,
+                price: b.unitPrice,
+                currency: b.currency,
+                mainImageUrl: b.mainImageUrl || "",
+                sellerCompany: sellerName || "Seller",
+                sellerId: sellerId,
+                bucketKey: b.key,
+                isSelected: true,
+                brand: b.brand,
+                model: b.model,
+                variant: b.variant,
+                color: b.color,
+                condition: b.condition,
+                bodyType: b.bodyType,
+            }));
+            const scopedKey = `negotiationItems_${conversationId}`;
+            window.localStorage.setItem(scopedKey, JSON.stringify(items));
+            window.dispatchEvent(new Event("quoteBuilderUpdated"));
+        } catch {}
+    }, [activeProposal, conversationId, isSeller, sellerId, sellerName]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -430,11 +478,11 @@ export default function NegotiationClientWrapper({
                             agreedPriceLocked: false,
                             userPrice: "",
                             userPriceLocked: false,
-                            roleType: role || "",
+                            roleType: effectiveRole || "",
                         }}
                         initialChats={initialChats ?? []}
                         userId={userId}
-                        role={role || ""}
+                        role={effectiveRole || ""}
                         conversationId={conversationId}
                         currency={currency || "USD"}
                         sellerName={sellerName}
@@ -446,6 +494,33 @@ export default function NegotiationClientWrapper({
             {/* Right Column: Status Card and Make a Proposal / Your Proposal Summary */}
             <div className="space-y-6 h-fit lg:sticky lg:top-8">
                 {/* Status Card - Shows current negotiation status */}
+                {enableRoleToggle && isRoleToggleEnabled ? (
+                    <div className="flex items-center justify-end mb-3">
+                        <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+                            <span>View as</span>
+                            <div className="inline-flex rounded-md border border-stroke-light bg-white p-0.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setDemoRole("buyer")}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded ${
+                                        demoRole?.toLowerCase() === "buyer" ? "bg-brand-blue text-white" : "text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                >
+                                    Buyer
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setDemoRole("seller")}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded ${
+                                        demoRole?.toLowerCase() === "seller" ? "bg-brand-blue text-white" : "text-gray-600 hover:bg-gray-50"
+                                    }`}
+                                >
+                                    Seller
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
                 <div className="border border-stroke-light rounded-lg p-5 bg-white">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold text-gray-900">Status</h3>
@@ -485,10 +560,15 @@ export default function NegotiationClientWrapper({
                         isSubmitting={isSubmitting}
                         submissionError={submissionError}
                         conversationId={conversationId}
+                        onFinalPriceDoubleTap={() => setIsRoleToggleEnabled((prev) => !prev)}
                     />
                 ) : activeProposal ? (
                     <>
-                        <YourProposalSummary proposal={activeProposal} currency={currency || "USD"} />
+                        <YourProposalSummary
+                            proposal={activeProposal}
+                            currency={currency || "USD"}
+                            onFinalPriceDoubleTap={() => setIsRoleToggleEnabled((prev) => !prev)}
+                        />
                         {activeProposal.status === "seller_accepted" && isBuyer && vehicleId ? (
                             <div className="mt-4">
                                 <Button onClick={() => setShowCartModal(true)} className="w-full">

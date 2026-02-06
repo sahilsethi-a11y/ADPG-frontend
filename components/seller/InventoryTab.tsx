@@ -5,7 +5,7 @@ import Button from "@/elements/Button";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { api } from "@/lib/api/client-request";
 import Link from "next/link";
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import message from "@/elements/message";
 import { useRouter } from "next/navigation";
 import Input from "@/elements/Input";
@@ -86,6 +86,8 @@ const initialFormState = {
     year: "",
     regionalSpecs: "",
     allowPriceNegotiations: "",
+    sortBy: "createdAt",
+    sortOrder: "desc",
 };
 
 const currentYear = new Date().getFullYear();
@@ -99,6 +101,46 @@ const years = Array.from({ length: 30 }, (_, i) => {
 });
 
 const yearOptions = [{ label: "All Years", value: "" }, ...years];
+const sortOptions = [
+    { label: "Recently Added", value: "createdAt|desc" },
+    { label: "Oldest First", value: "createdAt|asc" },
+    { label: "Price: Low to High", value: "price|asc" },
+    { label: "Price: High to Low", value: "price|desc" },
+    { label: "Year: Newest First", value: "year|desc" },
+    { label: "Year: Oldest First", value: "year|asc" },
+];
+
+const parseTimestamp = (value: unknown) => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return 0;
+        const asNum = Number(trimmed);
+        if (Number.isFinite(asNum)) return asNum;
+        const parsed = Date.parse(trimmed);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+};
+
+const getInventoryTimestamp = (item: Data["content"][number]) => {
+    const inv = item.inventory as any;
+    const raw =
+        inv?.createdAt ??
+        inv?.created_at ??
+        inv?.updatedAt ??
+        inv?.updated_at ??
+        inv?.listedAt ??
+        inv?.listingDate ??
+        (item as any)?.createdAt ??
+        (item as any)?.created_at ??
+        (item as any)?.updatedAt ??
+        (item as any)?.updated_at;
+    const ts = parseTimestamp(raw);
+    if (ts) return ts;
+    return parseTimestamp(inv?.id ?? item?.id);
+};
 
 export default function InventoryTab({ data: initialData, brands, filterData }: Readonly<PropsT>) {
     const [formState, setFormState] = useState(initialFormState);
@@ -121,14 +163,38 @@ export default function InventoryTab({ data: initialData, brands, filterData }: 
         });
     };
 
+    const handleSortChange = (value: string) => {
+        const [sortBy, sortOrder] = value.split("|");
+        setFormState((prev) => {
+            const filters = { ...prev, sortBy, sortOrder };
+            applyFilter(filters);
+            return filters;
+        });
+    };
+
     const applyFilter = async (filter: Record<string, string>, page = initialData.currentPage, size = initialData.size) => {
         try {
             const res = await api.get<{ data: Data }>("/inventory/api/v1/inventory/getAllInventoryListForUser", { params: { ...filter, page, size } });
-            setData(res.data);
+            const next = res.data;
+            if (filter.sortBy === "createdAt") {
+                const dir = filter.sortOrder === "asc" ? 1 : -1;
+                next.content = [...next.content].sort((a, b) => (getInventoryTimestamp(a) - getInventoryTimestamp(b)) * dir);
+            }
+            setData(next);
         } catch {
             console.log("Something went wrong");
         }
     };
+
+    useEffect(() => {
+        if (formState.sortBy !== "createdAt") return;
+        setData((prev) => ({
+            ...prev,
+            content: [...prev.content].sort(
+                (a, b) => (getInventoryTimestamp(a) - getInventoryTimestamp(b)) * (formState.sortOrder === "asc" ? 1 : -1)
+            ),
+        }));
+    }, [formState.sortBy, formState.sortOrder]);
 
     return (
         <div>
@@ -145,6 +211,16 @@ export default function InventoryTab({ data: initialData, brands, filterData }: 
                 </div>
                 <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                     <Input placeholder="Search vehicles..." parentClassName="lg:col-span-2" name="query" label="Search" value={formState.query} onChange={handleInputChange} />
+                    <Select
+                        label="Sort By"
+                        name="sortBy"
+                        options={sortOptions}
+                        value={`${formState.sortBy}|${formState.sortOrder}`}
+                        onChange={(value) => handleSortChange(value as string)}
+                        placeholder="Select sorting"
+                        border="bg-input-background"
+                        labelCls="text-sm font-medium"
+                    />
                     <Select
                         label="Brand"
                         name="brand"

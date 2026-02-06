@@ -4,6 +4,7 @@ import Services from "@/components/Services";
 import TopBanner from "@/components/TopBanner";
 import SignupCard from "@/components/SignupCard";
 import Statistics from "@/components/Statistics";
+import VehiclesPrefetchOnMount from "@/components/VehiclesPrefetchOnMount";
 import { getBrands, getFilters } from "@/lib/data";
 import { Suspense } from "react";
 
@@ -120,6 +121,7 @@ export default function Home() {
 
     return (
         <main className="bg-white relative size-full">
+            <VehiclesPrefetchOnMount />
             <TopBanner title={data.topBanner.title} description={data.topBanner.description} image={data.topBanner.image} />
             <section className="relative -mt-[calc(15rem+12vh)] lg:-mt-[calc(16rem+14vh)] lg:px-4 mb-40">
                 <div className="container mx-auto max-w-6xl px-4">

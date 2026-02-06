@@ -41,6 +41,7 @@ export default function NegotiationBucketCard({
   isLocked,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Calculate discounted price
   const originalPrice = bucket.bucketTotal;
@@ -60,11 +61,13 @@ export default function NegotiationBucketCard({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Thumbnail */}
           <div className="relative h-10 w-14 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+            {!imageLoaded ? <div className="absolute inset-0 bg-gray-200" aria-hidden="true" /> : null}
             <Image
               src={bucket.mainImageUrl}
               alt={`${bucket.brand} ${bucket.model}`}
               fill
-              className="object-cover"
+              onLoadingComplete={() => setImageLoaded(true)}
+              className={`object-cover transition-opacity ${imageLoaded ? "opacity-100" : "opacity-0"}`}
             />
           </div>
 
@@ -73,11 +76,39 @@ export default function NegotiationBucketCard({
             {/* Title + Unit Badge */}
             <div className="flex items-center gap-2 mb-0.5">
               <h4 className="text-sm font-medium text-gray-900 truncate">
-                {bucket.year} {bucket.brand} {bucket.model}
+                {bucket.items?.[0]?.name || [bucket.brand, bucket.model].filter(Boolean).join(" ")}
               </h4>
-              <span className="bg-brand-blue text-white text-[8px] font-semibold px-1 py-0.5 rounded-full flex-shrink-0">
-                {bucket.unitCount}u
+              <span className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[10px] font-medium text-gray-700 px-2 py-0.5 whitespace-nowrap">
+                {bucket.unitCount} unit{bucket.unitCount === 1 ? "" : "s"}
               </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {bucket.variant ? (
+                <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-[10px] font-medium w-fit whitespace-nowrap bg-gray-50 text-gray-600 border-gray-300">
+                  Variant: {bucket.variant}
+                </span>
+              ) : null}
+              {bucket.color ? (
+                <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-[10px] font-medium w-fit whitespace-nowrap bg-gray-50 text-gray-600 border-gray-300">
+                  Color: {bucket.color}
+                </span>
+              ) : null}
+              {bucket.condition ? (
+                <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-[10px] font-medium w-fit whitespace-nowrap bg-gray-50 text-gray-600 border-gray-300">
+                  Grade: {bucket.condition}
+                </span>
+              ) : null}
+              {bucket.year ? (
+                <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-[10px] font-medium w-fit whitespace-nowrap bg-gray-50 text-gray-600 border-gray-300">
+                  Year: {bucket.year}
+                </span>
+              ) : null}
+              {bucket.bodyType ? (
+                <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-[10px] font-medium w-fit whitespace-nowrap bg-gray-50 text-gray-600 border-gray-300">
+                  Body: {bucket.bodyType}
+                </span>
+              ) : null}
             </div>
 
             {/* Seller Name */}
@@ -145,7 +176,18 @@ export default function NegotiationBucketCard({
                   <p className="text-xs font-medium text-gray-900 truncate">
                     {item.name} {item.year && `(${item.year})`}
                   </p>
-                  <p className="text-[11px] text-gray-500">Qty: {item.quantity}</p>
+                  {(() => {
+                    const mileageText =
+                      item.mileage !== undefined && item.mileage !== null && `${item.mileage}`.trim() !== ""
+                        ? `${item.mileage}`
+                        : "—";
+                    return (
+                  <p className="text-[11px] text-gray-500">
+                    Qty: {item.quantity}
+                    {` • Mileage: ${mileageText}`}
+                  </p>
+                    );
+                  })()}
                 </div>
 
                 {/* Unit Price */}

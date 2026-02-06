@@ -221,9 +221,9 @@ export default function DetailForm({ formState, errors, updateFormField, setStep
                     <div>
                         <div className="flex gap-2 text-sm items-center">
                             <Shield className="w-3.5 h-3.5" />
-                            Inspection Report *
+                            Inspection Report
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">Upload a comprehensive vehicle inspection report (PDF only, max 10MB)</p>
+                        <p className="text-sm text-muted-foreground mt-1">Optional: upload a vehicle inspection report (PDF only, max 10MB)</p>
                     </div>
                     {item.inspectionReportUrl ? (
                         <div className="border border-gray-300 rounded-lg p-4 bg-green-50 mt-4">

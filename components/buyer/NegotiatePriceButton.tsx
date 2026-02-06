@@ -22,13 +22,20 @@ export default function NegotiatePriceButton({ vehicleId, peerId }: Readonly<{ v
     const [disabled, setDisabled] = useState(false);
     const pathname = usePathname();
 
+    const createConversationId = (buyerId: string) => {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+            return `${buyerId}_${peerId}_${vehicleId}_${crypto.randomUUID()}`;
+        }
+        return `${buyerId}_${peerId}_${vehicleId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    };
+
     const handleNegotiatePrice = async () => {
         try {
             setLoading(true);
             const userData = await api.get<{ data: User }>("/api/v1/auth/getUserInfoByToken");
 
             if (userData.data?.roleType?.toLocaleLowerCase() === "buyer") {
-                const conversationId = `${userData.data.userId}_${peerId}_${vehicleId}`;
+                const conversationId = createConversationId(userData.data.userId);
                 fetch("/api/negotiation-index", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },

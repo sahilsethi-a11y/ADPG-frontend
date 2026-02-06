@@ -38,6 +38,7 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
 
     const res = await api.get<{ data: Data }>("/inventory/api/v1/inventory/getInventoryDetails", { params: { id: vehicleSlug } });
     const data = res.data;
+    const mileage = data.vehicleDetails?.[0]?.mileage ?? "";
     const storageItem = {
         id: data.id,
         name: data.name,
@@ -51,6 +52,13 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
         sellerId: data.sellerInformation?.id,
         bucketKey: [data.name, data.price, data.currency].join("|"),
         isSelected: true,
+        mileage,
+        brand: (data as any)?.inventory?.brand ?? (data as any)?.brand,
+        model: (data as any)?.inventory?.model ?? (data as any)?.model,
+        variant: (data as any)?.inventory?.variant ?? (data as any)?.variant,
+        color: (data as any)?.inventory?.color ?? (data as any)?.color,
+        condition: (data as any)?.inventory?.condition ?? (data as any)?.condition,
+        bodyType: (data as any)?.inventory?.bodyType ?? (data as any)?.bodyType,
     };
 
     const vin =
@@ -118,7 +126,13 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
                                     </div>
                                     <div className="text-[16px] text-[#4d4f53] mb-6">{data.name}</div>
                                     <div className="mb-6 flex flex-col gap-3">
-                                        <AddToCartButton vehicleId={vehicleSlug} storageItem={storageItem} sellerId={data.sellerInformation.id} sellerCompany={data.sellerInformation.name} />
+                                        <AddToCartButton
+                                            vehicleId={vehicleSlug}
+                                            storageItem={storageItem}
+                                            sellerId={data.sellerInformation.id}
+                                            sellerCompany={data.sellerInformation.name}
+                                            label="Add to Quote Builder"
+                                        />
                                         {vin ? (
                                             <a
                                                 href={`https://report.adpgauto.com/${encodeURIComponent(vin)}`}

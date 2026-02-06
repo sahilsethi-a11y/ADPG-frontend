@@ -33,6 +33,7 @@ type PropsT = {
         sellerId?: string;
         bucketKey: string;
         isSelected?: boolean;
+        mileage?: string | number;
     };
 };
 
@@ -90,6 +91,7 @@ export default function AddToCartButton({
     const [loading, setLoading] = useState(false);
     const [disabled, setDisabled] = useState(false);
     const [isBuyer, setIsBuyer] = useState<boolean | null>(null);
+    const [localInQuote, setLocalInQuote] = useState(false);
     const quoteStorageKey = "quoteBuilderIds";
     const quoteSellerStorageKey = "quoteBuilderSellerByVehicle";
     const quoteSellerCompanyStorageKey = "quoteBuilderSellerByCompany";
@@ -116,6 +118,26 @@ export default function AddToCartButton({
             isActive = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const refresh = () => {
+            try {
+                const raw = window.localStorage.getItem(quoteStorageKey);
+                const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+                setLocalInQuote(parsed.includes(vehicleId));
+            } catch {
+                setLocalInQuote(false);
+            }
+        };
+        refresh();
+        window.addEventListener("storage", refresh);
+        window.addEventListener("quoteBuilderUpdated", refresh);
+        return () => {
+            window.removeEventListener("storage", refresh);
+            window.removeEventListener("quoteBuilderUpdated", refresh);
+        };
+    }, [quoteStorageKey, vehicleId]);
 
     const persistQuoteLocal = () => {
         if (typeof window === "undefined") return;
@@ -157,6 +179,46 @@ export default function AddToCartButton({
         } catch {}
     };
 
+    const removeQuoteLocal = () => {
+        if (typeof window === "undefined") return;
+        try {
+            const rawItems = window.localStorage.getItem(quoteItemsStorageKey);
+            const parsedItems = rawItems ? (JSON.parse(rawItems) as any[]) : [];
+            window.localStorage.setItem(
+                quoteItemsStorageKey,
+                JSON.stringify(parsedItems.filter((i) => i?.id !== vehicleId))
+            );
+
+            const raw = window.localStorage.getItem(quoteStorageKey);
+            const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+            window.localStorage.setItem(
+                quoteStorageKey,
+                JSON.stringify(parsed.filter((id) => id !== vehicleId))
+            );
+
+            const rawMap = window.localStorage.getItem(quoteSellerStorageKey);
+            const parsedMap = rawMap ? (JSON.parse(rawMap) as Record<string, string>) : {};
+            delete parsedMap[vehicleId];
+            window.localStorage.setItem(quoteSellerStorageKey, JSON.stringify(parsedMap));
+
+            if (sellerCompany) {
+                const rawCompanyMap = window.localStorage.getItem(quoteSellerCompanyStorageKey);
+                const parsedCompanyMap = rawCompanyMap ? (JSON.parse(rawCompanyMap) as Record<string, string>) : {};
+                delete parsedCompanyMap[sellerCompany];
+                window.localStorage.setItem(quoteSellerCompanyStorageKey, JSON.stringify(parsedCompanyMap));
+            }
+
+            if (sellerCompany) {
+                const rawVehicleCompanyMap = window.localStorage.getItem(quoteVehicleCompanyStorageKey);
+                const parsedVehicleCompanyMap = rawVehicleCompanyMap ? (JSON.parse(rawVehicleCompanyMap) as Record<string, string>) : {};
+                delete parsedVehicleCompanyMap[sellerCompany];
+                window.localStorage.setItem(quoteVehicleCompanyStorageKey, JSON.stringify(parsedVehicleCompanyMap));
+            }
+
+            window.dispatchEvent(new Event("quoteBuilderUpdated"));
+        } catch {}
+    };
+
     const handleAddTocart = async () => {
         try {
             if (quantity < 1 && !isNegotiated) {
@@ -183,19 +245,30 @@ export default function AddToCartButton({
 
     if (isBuyer === false) return null;
     if (isBuyer === null) return null;
+    const inQuote = isInQuoteBuilder || localInQuote;
+
+    const handleClick = () => {
+        if (inQuote) {
+            removeQuoteLocal();
+            message.success("Removed from quote builder");
+            return;
+        }
+        handleAddTocart();
+    };
+
     return (
         <>
             <Button
                 type="button"
-                disabled={disabled || isInQuoteBuilder}
+                disabled={disabled}
                 loading={loading}
-                onClick={handleAddTocart}
+                onClick={handleClick}
                 fullWidth={fullWidth}
                 variant={variant}
                 size={size}
                 className={className}
             >
-                {isInQuoteBuilder ? "In Quote Builder" : label}
+                {inQuote ? "Remove" : label}
             </Button>
 
         </>

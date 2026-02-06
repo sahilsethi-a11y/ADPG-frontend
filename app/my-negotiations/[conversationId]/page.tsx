@@ -37,21 +37,23 @@ export default async function MyConversation({
     searchParams?: Promise<{ seller?: string }>;
 }) {
     const cookieStore = await cookies();
-    const userId = cookieStore.get("userToken")?.value || "";
+    const tokenValue = cookieStore.get("userToken")?.value || "";
 
-    const userPromise = api.get<{ data: { roleType: string } }>("/api/v1/auth/getUserInfoByToken", { isAuthRequired: false });
+    const userPromise = api.get<{ data: { roleType: string; userId: string } }>("/api/v1/auth/getUserInfoByToken", { isAuthRequired: false });
 
     const { conversationId } = await params;
     const searchParamsResolved = await searchParams;
-    const respPromise = api.get<{ data: Data }>(`/chat/api/conversations/messages/${conversationId}`, {
-        params: { userId, page: 0, size: 100 },
+    const userData = await userPromise;
+    const resolvedUserId = userData.data?.userId || tokenValue;
+    const resp = await api.get<{ data: Data }>(`/chat/api/conversations/messages/${conversationId}`, {
+        params: { userId: resolvedUserId, page: 0, size: 100 },
     });
-
-    const [resp, userData] = await Promise.all([respPromise, userPromise]);
 
     const vehicle = resp.data?.vehicle;
     const sellerQuery = typeof searchParamsResolved?.seller === "string" ? decodeURIComponent(searchParamsResolved.seller) : "";
     const sellerId = conversationId.split("_")[1] ?? "";
+    const fallbackVehicleId = conversationId.split("_")[2] ?? "";
+    const resolvedVehicleId = vehicle?.id || fallbackVehicleId;
 
     return (
         <main className="container mx-auto px-4 py-8 max-w-7xl min-h-screen flex flex-col pb-32">
@@ -74,10 +76,11 @@ export default async function MyConversation({
                     currency={vehicle?.currency || "USD"}
                     sellerName={sellerQuery}
                     sellerId={sellerId}
-                    userId={userId}
+                    userId={resolvedUserId}
                     role={userData.data?.roleType}
+                    enableRoleToggle={true}
                     conversationId={conversationId}
-                    vehicleId={vehicle?.id}
+                    vehicleId={resolvedVehicleId}
                 />
             </div>
         </main>

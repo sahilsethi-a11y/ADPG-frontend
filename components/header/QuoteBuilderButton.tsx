@@ -37,7 +37,9 @@ export default function QuoteBuilderButton() {
             <Link className="p-2 hover:bg-gray-100 block rounded-md" href="/quote-builder" title="Quote Builder">
                 <FileIcon className="h-4 w-4" />
             </Link>
-            <span className="h-4 w-4 rounded-full bg-destructive text-xs absolute -top-0.5 -right-0.5 text-white flex justify-center items-center">{count}</span>
+            <span className="min-w-4 h-4 px-1 rounded-full bg-destructive text-[10px] absolute -top-0.5 -right-0.5 text-white flex justify-center items-center">
+                {count}
+            </span>
         </div>
     );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { formatPrice } from "@/lib/utils";
 
 type ActiveProposal = {
@@ -24,9 +25,11 @@ type ActiveProposal = {
 type Props = {
   proposal: ActiveProposal;
   currency: string;
+  onFinalPriceDoubleTap?: () => void;
 };
 
-export default function YourProposalSummary({ proposal, currency }: Props) {
+export default function YourProposalSummary({ proposal, currency, onFinalPriceDoubleTap }: Props) {
+  const lastTapRef = useRef(0);
   return (
     <div className="border border-stroke-light rounded-lg p-5 bg-white">
       {/* Header */}
@@ -78,7 +81,20 @@ export default function YourProposalSummary({ proposal, currency }: Props) {
         </div>
         <div className="border-t border-blue-200 pt-2 flex justify-between text-sm font-semibold">
           <span className="text-gray-900">Final Price:</span>
-          <span className="text-brand-blue text-lg">{formatPrice(proposal.finalPrice, currency)}</span>
+          <span
+            className="text-brand-blue text-lg"
+            onDoubleClick={onFinalPriceDoubleTap}
+            onTouchEnd={() => {
+              if (!onFinalPriceDoubleTap) return;
+              const now = Date.now();
+              if (now - lastTapRef.current < 300) {
+                onFinalPriceDoubleTap();
+              }
+              lastTapRef.current = now;
+            }}
+          >
+            {formatPrice(proposal.finalPrice, currency)}
+          </span>
         </div>
       </div>
 

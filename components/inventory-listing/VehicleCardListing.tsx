@@ -1,9 +1,11 @@
 "use client";
 
-import type { Content, Data } from "@/app/vehicles/page";
+import type { Content } from "@/app/vehicles/page";
 import { useEffect, useMemo, useRef, useState } from "react";
 import SortedBy from "@/components/SortedBy";
 import VehicleCard from "@/components/VehicleCard";
+import Pagination from "@/components/Pagination";
+import QuoteBuilderButton from "@/components/header/QuoteBuilderButton";
 import type { SearchParams } from "next/dist/server/request/search-params";
 import Image from "@/elements/Image";
 import { EyeIcon, MapPinIcon } from "@/components/Icons";
@@ -15,6 +17,10 @@ import Button from "@/elements/Button";
 import PriceBadge from "@/elements/PriceBadge";
 import Select from "@/elements/Select";
 import { api } from "@/lib/api/client-request";
+import message from "@/elements/message";
+import { useVehicleBuckets } from "@/hooks/useVehicleBuckets";
+import type { BucketMeta } from "@/lib/bucketCache";
+import { toBucketMeta } from "@/lib/bucketing";
 
 type PropsT = {
   initialData: Content[];
@@ -70,40 +76,8 @@ type Bucket = {
 
 const safeStr = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const safeNum = (v: unknown) => (typeof v === "number" ? v : Number(v));
+const normalize = (v: unknown) => safeStr(v).toLowerCase();
 
-const buildSearchParams = (params: Record<string, unknown>) => {
-  const sp = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (Array.isArray(value)) {
-      for (const v of value) {
-        if (v === undefined || v === null || v === "") continue;
-        sp.append(key, String(v));
-      }
-    } else {
-      if (value === undefined || value === null || value === "") continue;
-      sp.set(key, String(value));
-    }
-  }
-  return sp;
-};
-
-const clientSearch = async (params: Record<string, unknown>) => {
-  const searchParams = buildSearchParams(params);
-  const res = await fetch(`/api/inventory/search?${searchParams.toString()}`, {
-    credentials: "include",
-  });
-  return res.json();
-};
-
-const parsePrice = (price: unknown) => {
-  if (typeof price === "number") return Number.isFinite(price) ? price : 0;
-  if (typeof price === "string") {
-    const cleaned = price.replace(/[^0-9.]/g, "");
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-};
 
 const getMileage = (inv: InventoryMaybeExtended, inventoryData?: { mileage?: string | number }) => {
   const v =
@@ -123,6 +97,40 @@ const parseMileage = (value: string) => {
   const cleaned = value.replace(/[^0-9.]/g, "");
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : undefined;
+};
+
+const parseTimestamp = (value: unknown) => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return 0;
+    const asNum = Number(trimmed);
+    if (Number.isFinite(asNum)) return asNum;
+    const parsed = Date.parse(trimmed);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const getVehicleTimestamp = (inv: InventoryMaybeExtended, item?: Content) => {
+  const raw =
+    (inv as any)?.createdAt ??
+    (inv as any)?.created_at ??
+    (inv as any)?.updatedAt ??
+    (inv as any)?.updated_at ??
+    (inv as any)?.listedAt ??
+    (inv as any)?.listingDate ??
+    (inv as any)?.createdOn ??
+    (inv as any)?.created_on ??
+    (item as any)?.createdAt ??
+    (item as any)?.created_at ??
+    (item as any)?.updatedAt ??
+    (item as any)?.updated_at;
+  const ts = parseTimestamp(raw);
+  if (ts) return ts;
+  const fallbackId = parseTimestamp((inv as any)?.id ?? (item as any)?.id);
+  return fallbackId;
 };
 
 const getVin = (inv: InventoryMaybeExtended, inventoryData?: { vin?: string }) => {
@@ -152,58 +160,28 @@ const buildBucketKey = (inv: InventoryMaybeExtended) => {
   return [brand, model, variant, color, year, condition, bodyType].join("|");
 };
 
-const bucketListings = (items: Content[]): Bucket[] => {
-  const map = new Map<string, Bucket>();
-
-  for (const item of items) {
-    const inv = item.inventory as InventoryMaybeExtended;
-    const key = buildBucketKey(inv);
-
-    const price = parsePrice(inv.price);
-    const currency = safeStr(inv.currency) || undefined;
-    const inventoryData = (item as any)?.inventoryData ?? (inv as any)?.inventoryData;
-    const mileageRaw = getMileage(inv, inventoryData);
-    const mileageNum = parseMileage(mileageRaw);
-
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, {
-        key,
-        brand: safeStr(inv.brand) || undefined,
-        model: safeStr(inv.model) || undefined,
-        variant: safeStr(inv.variant) || undefined,
-        color: safeStr(inv.color) || undefined,
-        year: safeNum(inv.year) || undefined,
-        condition: safeStr(inv.condition) || undefined,
-        bodyType: safeStr(inv.bodyType) || undefined,
-        currency,
-
-        count: 1,
-        representative: item,
-        items: [item],
-
-        minPrice: price,
-        maxPrice: price,
-        minMileage: mileageNum,
-        maxMileage: mileageNum,
-      });
-    } else {
-      existing.count += 1;
-      existing.items.push(item);
-      existing.currency = existing.currency || currency;
-      existing.minPrice = Math.min(existing.minPrice, price);
-      existing.maxPrice = Math.max(existing.maxPrice, price);
-      if (mileageNum !== undefined) {
-        existing.minMileage =
-          existing.minMileage === undefined ? mileageNum : Math.min(existing.minMileage, mileageNum);
-        existing.maxMileage =
-          existing.maxMileage === undefined ? mileageNum : Math.max(existing.maxMileage, mileageNum);
-      }
-    }
-  }
-
-  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+const getParamValues = (params: SearchParams, key: string) => {
+  const value = params?.[key];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
 };
+
+const parseRange = (value?: string) => {
+  if (!value) return undefined;
+  const nums = value.match(/\d+/g)?.map(Number).filter((n) => Number.isFinite(n));
+  if (!nums || nums.length === 0) return undefined;
+  if (value.includes("+")) return { min: nums[0], max: undefined };
+  if (nums.length >= 2) return { min: nums[0], max: nums[1] };
+  return { min: nums[0], max: undefined };
+};
+
+const hasActiveFilter = (params: SearchParams, keys: string[]) =>
+  keys.some((key) => {
+    const v = params?.[key];
+    if (Array.isArray(v)) return v.length > 0;
+    return !!v;
+  });
+
 
 // ---------- SlideOver (right side) ----------
 function SlideOver({
@@ -215,7 +193,7 @@ function SlideOver({
   children,
 }: {
   isOpen: boolean;
-  title: string;
+  title: React.ReactNode;
   onClose: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -245,8 +223,11 @@ function SlideOver({
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-stroke-light shrink-0">
-          <div className="font-semibold text-black truncate">{title}</div>
+          <div className="min-w-0">
+            {typeof title === "string" ? <div className="font-semibold text-black truncate">{title}</div> : title}
+          </div>
           <div className="flex items-center gap-2">
+            <QuoteBuilderButton />
             <button
               className="h-9 px-3 rounded-md border border-stroke-light hover:bg-gray-50 text-xs font-medium"
               onClick={onToggleExpand}
@@ -255,7 +236,7 @@ function SlideOver({
               {isExpanded ? "Make smaller" : "Expand"}
             </button>
             <button
-              className="h-9 px-3 rounded-md border border-stroke-light hover:bg-gray-50"
+              className="h-9 px-3 rounded-md border border-stroke-light hover:bg-gray-50 text-xs font-medium"
               onClick={onClose}
               type="button"
             >
@@ -308,11 +289,19 @@ function UnitCardRow({
       sellerId?: string;
       bucketKey: string;
       isSelected?: boolean;
+      mileage?: string | number;
+      brand?: string;
+      model?: string;
+      variant?: string;
+      color?: string;
+      condition?: string;
+      bodyType?: string;
     };
   }) => void;
   onRemoveFromQuote: (id: string) => void;
 }) {
   const router = useRouter();
+  const [imageLoaded, setImageLoaded] = useState(false);
   const inv = item.inventory as InventoryMaybeExtended;
 
   const inventoryData = (item as any)?.inventoryData;
@@ -341,6 +330,13 @@ function UnitCardRow({
     sellerId: sellerId,
     bucketKey: buildBucketKey(inv),
     isSelected: true,
+    mileage,
+    brand: inv.brand,
+    model: inv.model,
+    variant: inv.variant,
+    color: inv.color,
+    condition: inv.condition,
+    bodyType: inv.bodyType,
   };
 
   return (
@@ -350,13 +346,15 @@ function UnitCardRow({
     >
       {/* Thumbnail block like card image */}
       <div className="relative h-24 w-32 bg-gray-100 overflow-hidden shrink-0">
+        {!imageLoaded ? <div className="absolute inset-0 bg-gray-200" aria-hidden="true" /> : null}
         <Image
           src={inv.mainImageUrl}
           alt={`${inv.brand} ${inv.model}`}
           fill={true}
           height={96}
           width={128}
-          className="w-full object-cover"
+          onLoadingComplete={() => setImageLoaded(true)}
+          className={`w-full object-cover transition-opacity ${imageLoaded ? "opacity-100" : "opacity-0"}`}
         />
         <div className="absolute top-2.5 right-2.5">
           <ShortList
@@ -422,7 +420,7 @@ function UnitCardRow({
             >
               Remove
             </button>
-          ) : canUseQuoteBuilder ? (
+          ) : (
             <button
               type="button"
               onClick={(e) => {
@@ -433,7 +431,7 @@ function UnitCardRow({
             >
               Add to Quote Builder
             </button>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
@@ -449,20 +447,116 @@ export default function VehicleCardListing({
   totalPages,
   pageSize,
 }: Readonly<PropsT>) {
-  const lastRef = useRef(initialLast);
-  const pageRef = useRef(typeof currentPage === "number" ? currentPage + 1 : 2);
-  const loadingRef = useRef(false);
-  const pageParamRef = useRef<"page" | "pageNo" | "pageNumber" | "pageIndex">("page");
-  const pageBaseRef = useRef<0 | 1>(1);
+  const { vehicles, buckets: bucketMeta } = useVehicleBuckets(querySearchParams, { refreshOnMount: false });
+  const filterKeys = [
+    "bodyType",
+    "brand",
+    "model",
+    "priceRange",
+    "searchText",
+    "condition",
+    "color",
+    "fuelType",
+    "drivetrain",
+    "regionalSpecs",
+    "transmission",
+    "minMileage",
+    "maxMileage",
+    "yearFrom",
+    "yearTo",
+    "country",
+  ];
+  const hasFilters = useMemo(() => hasActiveFilter(querySearchParams, filterKeys), [querySearchParams]);
 
-  const [items, setItems] = useState(initialData);
+  const filteredVehicles = useMemo(() => {
+    const list = vehicles as Content[];
+    if (!hasFilters) return list;
+
+    const bodyType = normalize(getParamValues(querySearchParams, "bodyType")[0]);
+    const brand = normalize(getParamValues(querySearchParams, "brand")[0]);
+    const model = normalize(getParamValues(querySearchParams, "model")[0]);
+    const condition = normalize(getParamValues(querySearchParams, "condition")[0]);
+    const color = normalize(getParamValues(querySearchParams, "color")[0]);
+    const transmission = normalize(getParamValues(querySearchParams, "transmission")[0]);
+    const regionalSpecs = normalize(getParamValues(querySearchParams, "regionalSpecs")[0]);
+    const searchText = normalize(getParamValues(querySearchParams, "searchText")[0]);
+    const fuelType = getParamValues(querySearchParams, "fuelType").map(normalize);
+    const drivetrain = getParamValues(querySearchParams, "drivetrain").map(normalize);
+
+    const yearFrom = Number(getParamValues(querySearchParams, "yearFrom")[0] ?? "");
+    const yearTo = Number(getParamValues(querySearchParams, "yearTo")[0] ?? "");
+    const minMileage = Number(getParamValues(querySearchParams, "minMileage")[0] ?? "");
+    const maxMileage = Number(getParamValues(querySearchParams, "maxMileage")[0] ?? "");
+    const priceRange = parseRange(getParamValues(querySearchParams, "priceRange")[0]);
+
+    return list.filter((item) => {
+      const inv = item.inventory as InventoryMaybeExtended;
+      const inventoryData = (item as any)?.inventoryData ?? inv.inventoryData;
+
+      if (bodyType && normalize(inv.bodyType) !== bodyType) return false;
+      if (brand && normalize(inv.brand) !== brand) return false;
+      if (model && normalize(inv.model) !== model) return false;
+      if (condition && normalize(inv.condition) !== condition) return false;
+      if (color && normalize(inv.color) !== color) return false;
+      if (transmission && normalize(inv.transmission) !== transmission) return false;
+      if (regionalSpecs && normalize((inv as any)?.regionalSpecs) !== regionalSpecs) return false;
+      if (fuelType.length && !fuelType.includes(normalize(inv.fuelType))) return false;
+      if (drivetrain.length && !drivetrain.includes(normalize((inv as any)?.drivetrain))) return false;
+
+      if (Number.isFinite(yearFrom) && yearFrom > 0 && Number(inv.year) < yearFrom) return false;
+      if (Number.isFinite(yearTo) && yearTo > 0 && Number(inv.year) > yearTo) return false;
+
+      const mileageValue = parseMileage(getMileage(inv, inventoryData)) ?? 0;
+      if (Number.isFinite(minMileage) && minMileage > 0 && mileageValue < minMileage) return false;
+      if (Number.isFinite(maxMileage) && maxMileage > 0 && mileageValue > maxMileage) return false;
+
+      if (priceRange) {
+        const price = Number(inv.price) || 0;
+        if (priceRange.min !== undefined && price < priceRange.min) return false;
+        if (priceRange.max !== undefined && price > priceRange.max) return false;
+      }
+
+      if (searchText) {
+        const haystack = [
+          inv.brand,
+          inv.model,
+          inv.variant,
+          inv.bodyType,
+          inv.condition,
+          inv.color,
+        ]
+          .map(normalize)
+          .filter(Boolean)
+          .join(" ");
+        if (!haystack.includes(searchText)) return false;
+      }
+
+      return true;
+    });
+  }, [vehicles, querySearchParams, hasFilters]);
+
+  const displayBucketMeta = useMemo(() => {
+    if (!hasFilters) return bucketMeta as BucketMeta[];
+    return toBucketMeta(filteredVehicles as unknown as any[], 30);
+  }, [bucketMeta, filteredVehicles, hasFilters]);
+
+  const vehiclePool = hasFilters ? filteredVehicles : (vehicles as Content[]);
   const [sortBy, setSortBy] = useState("sortBy=price&sortOrder=asc");
   const sortByRef = useRef("sortBy=price&sortOrder=asc");
+  const [bucketPage, setBucketPage] = useState(1);
+  const bucketPageSize = 12;
 
   const [openBucketKey, setOpenBucketKey] = useState<string | null>(null);
   const [isModalExpanded, setIsModalExpanded] = useState(false);
   const [showBucketInfo, setShowBucketInfo] = useState(false);
-  const prefetchedAllRef = useRef(false);
+  const vehicleMap = useMemo(() => {
+    const map = new Map<string, Content>();
+    for (const v of vehicles ?? []) {
+      const id = v?.inventory?.id ?? v?.id;
+      if (id) map.set(String(id), v as Content);
+    }
+    return map;
+  }, [vehicles]);
   const quoteItemsStorageKey = "quoteBuilderItems";
   const quoteStorageKey = "quoteBuilderIds";
   const quoteSellerStorageKey = "quoteBuilderSellerByVehicle";
@@ -470,8 +564,9 @@ export default function VehicleCardListing({
   const quoteVehicleCompanyStorageKey = "quoteBuilderVehicleByCompany";
   const [quoteIds, setQuoteIds] = useState<string[]>([]);
   const quoteIdSet = useMemo(() => new Set(quoteIds), [quoteIds]);
-  const [isBuyer, setIsBuyer] = useState<boolean | null>(null);
-  const canUseQuoteBuilder = isBuyer === true;
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const canUseQuoteBuilder = userRole === "buyer";
   const [modalSort, setModalSort] = useState<"price-asc" | "price-desc" | "mileage-asc" | "mileage-desc">(
     "price-asc"
   );
@@ -481,6 +576,28 @@ export default function VehicleCardListing({
     { value: "mileage-asc", label: "Mileage: Low to High" },
     { value: "mileage-desc", label: "Mileage: High to Low" },
   ];
+  const bucketRecentMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const v of vehiclePool ?? []) {
+      const key = buildBucketKey(v.inventory as InventoryMaybeExtended);
+      const ts = getVehicleTimestamp(v.inventory as InventoryMaybeExtended, v as Content);
+      if (!key) continue;
+      map.set(key, Math.max(map.get(key) ?? 0, ts));
+    }
+    return map;
+  }, [vehiclePool]);
+
+  const bucketAddedCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!canUseQuoteBuilder) return map;
+    for (const v of vehiclePool ?? []) {
+      const id = v?.inventory?.id ?? v?.id;
+      if (!id || !quoteIdSet.has(normalizeId(id))) continue;
+      const key = buildBucketKey(v.inventory as InventoryMaybeExtended);
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [vehiclePool, quoteIdSet, canUseQuoteBuilder]);
 
   useEffect(() => {
     let isActive = true;
@@ -491,10 +608,17 @@ export default function VehicleCardListing({
         });
         const role = userData.data?.roleType?.toLowerCase();
         if (!isActive) return;
-        setIsBuyer(role === "buyer");
+        if (role) {
+          setUserRole(role);
+          setIsLoggedIn(true);
+        } else {
+          setUserRole(null);
+          setIsLoggedIn(false);
+        }
       } catch {
         if (!isActive) return;
-        setIsBuyer(false);
+        setUserRole(null);
+        setIsLoggedIn(false);
       }
     };
     fetchRole();
@@ -516,6 +640,7 @@ export default function VehicleCardListing({
       setQuoteIds(localIds);
     } catch {}
   }, [canUseQuoteBuilder]);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -547,6 +672,13 @@ export default function VehicleCardListing({
       sellerId?: string;
       bucketKey: string;
       isSelected?: boolean;
+      mileage?: string | number;
+      brand?: string;
+      model?: string;
+      variant?: string;
+      color?: string;
+      condition?: string;
+      bodyType?: string;
     };
   }) => {
     if (typeof window === "undefined") return;
@@ -608,198 +740,127 @@ export default function VehicleCardListing({
     } catch {}
   };
 
-  const getPaginatedData = async (page: number, sort: string = sortByRef.current, isScroll = true) => {
-    try {
-      loadingRef.current = true;
-
-      const pageValue = page - (pageBaseRef.current === 0 ? 1 : 0);
-
-      const res = await clientSearch({
-        ...querySearchParams,
-        [pageParamRef.current]: String(pageValue),
-        sortBy: sort.split("&")[0]?.split("=")[1],
-        sortOrder: sort.split("&")[1]?.split("=")[1],
-      });
-
-      const data = res.data.content;
-      lastRef.current = res.data.last;
-
-      if (isScroll) setItems((prev) => [...prev, ...data]);
-      else setItems(data);
-    } catch (err) {
-      console.log(err, "error");
-    } finally {
-      setTimeout(() => (loadingRef.current = false), 1000);
-    }
-  };
-
-  const getAllPages = async (sort: string = sortByRef.current) => {
-    try {
-      loadingRef.current = true;
-      const candidates: Array<{ key: "page" | "pageNo" | "pageNumber" | "pageIndex"; base: 0 | 1 }> = [
-        { key: "page", base: 1 },
-        { key: "pageNo", base: 1 },
-        { key: "pageNumber", base: 1 },
-        { key: "pageIndex", base: 0 },
-      ];
-
-      let candidateIndex = 0;
-      let all: Content[] = [];
-      let page = 1;
-      let last = false;
-      let safety = 0;
-      let seen = new Set<string>();
-      let totalTarget: number | undefined;
-
-      const resetState = () => {
-        all = [];
-        page = 1;
-        last = false;
-        safety = 0;
-        seen = new Set<string>();
-        totalTarget = undefined;
-      };
-
-      while (!last && safety < 200 && candidateIndex < candidates.length) {
-        const { key, base } = candidates[candidateIndex];
-        const pageValue = String(page - (base === 0 ? 1 : 0));
-
-        const baseParams = {
-          ...querySearchParams,
-          sortBy: sort.split("&")[0]?.split("=")[1],
-          sortOrder: sort.split("&")[1]?.split("=")[1],
-        };
-
-        const res = await clientSearch({
-          ...baseParams,
-          [key]: pageValue,
-        });
-
-        const data = res.data.content;
-        last = res.data.last;
-        if (totalTarget === undefined) {
-          totalTarget = res.data.totalItems || res.data.totalElements || undefined;
-        }
-
-        let added = 0;
-        for (const item of data) {
-          const id = item?.inventory?.id ?? item?.id;
-          if (!id || seen.has(id)) continue;
-          seen.add(id);
-          all.push(item);
-          added += 1;
-        }
-
-        if (data.length === 0 || added === 0) {
-          if (page > 1 && candidateIndex < candidates.length - 1) {
-            candidateIndex += 1;
-            resetState();
-            continue;
-          }
-          break;
-        }
-        if (totalTarget && all.length >= totalTarget) break;
-
-        page += 1;
-        safety += 1;
-      }
-
-      const finalCandidate = candidates[Math.min(candidateIndex, candidates.length - 1)];
-      pageParamRef.current = finalCandidate.key;
-      pageBaseRef.current = finalCandidate.base;
-
-      const resolvedTotalPages = Number.isFinite(totalPages) && totalPages > 1 ? totalPages : undefined;
-      const baseParams = {
-        ...querySearchParams,
-        sortBy: sort.split("&")[0]?.split("=")[1],
-        sortOrder: sort.split("&")[1]?.split("=")[1],
-      };
-      if (resolvedTotalPages) {
-        const seenAll = new Set<string>();
-        const merged: Content[] = [];
-        for (const item of items) {
-          const id = item?.inventory?.id ?? item?.id;
-          if (!id || seenAll.has(id)) continue;
-          seenAll.add(id);
-          merged.push(item);
-        }
-
-        const pages = Array.from({ length: resolvedTotalPages - 1 }, (_, i) => i + 2);
-        const batchSize = 6;
-        for (let i = 0; i < pages.length; i += batchSize) {
-          const batch = pages.slice(i, i + batchSize);
-          const results = await Promise.all(
-            batch.map((p) =>
-              clientSearch({
-                ...baseParams,
-                [pageParamRef.current]: String(p - (pageBaseRef.current === 0 ? 1 : 0)),
-              }),
-            ),
-          );
-
-          for (const r of results) {
-            const list: Content[] = r?.data?.content ?? [];
-            for (const it of list) {
-              const id = it?.inventory?.id ?? it?.id;
-              if (!id || seenAll.has(id)) continue;
-              seenAll.add(id);
-              merged.push(it);
-            }
-          }
-
-          setItems([...merged]);
-        }
-
-        lastRef.current = true;
-        return;
-      }
-
-      lastRef.current = true;
-      setItems(all);
-    } catch (err) {
-      console.log(err, "error");
-    } finally {
-      setTimeout(() => (loadingRef.current = false), 1000);
-    }
-  };
-
-  const handleScroll = () => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
-      if (!lastRef.current && !loadingRef.current) {
-        getPaginatedData(pageRef.current);
-        pageRef.current = pageRef.current + 1;
-      }
-    }
-  };
-
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (prefetchedAllRef.current) return;
-    if (totalItems <= items.length) {
-      prefetchedAllRef.current = true;
-      return;
-    }
-    prefetchedAllRef.current = true;
-    getAllPages(sortByRef.current);
-    pageRef.current = 2;
-  }, [items.length, totalItems]);
-
   const handleSortChange = (value: string) => {
     setSortBy(value);
     sortByRef.current = value;
-    getAllPages(value);
-    pageRef.current = 2;
   };
 
-  const buckets = useMemo(() => bucketListings(items), [items]);
-  const groupsCount = buckets.length;
+  const allowQuoteBuilderAction = () => {
+    if (userRole === "buyer") return true;
+    if (isLoggedIn === false || isLoggedIn === null) {
+      message.info("Please log in to add to quote.");
+      return false;
+    }
+    message.info("Only buyers can add to quote.");
+    return false;
+  };
 
-  const activeBucket = openBucketKey ? buckets.find((b) => b.key === openBucketKey) : undefined;
+  const buckets = useMemo(() => {
+    const list: Bucket[] = [];
+    for (const meta of displayBucketMeta as BucketMeta[]) {
+      const rep =
+        (meta.representativeId && vehicleMap.get(meta.representativeId)) ||
+        (vehiclePool.find((v) => buildBucketKey(v.inventory as InventoryMaybeExtended) === meta.bucketKey) as Content | undefined);
+      if (!rep) continue;
+      list.push({
+        key: meta.bucketKey,
+        brand: meta.brand,
+        model: meta.model,
+        variant: meta.variant,
+        color: meta.color,
+        year: meta.year,
+        condition: meta.condition,
+        bodyType: meta.bodyType,
+        currency: meta.currency,
+        count: meta.count,
+        representative: rep,
+        items: [],
+        minPrice: meta.minPrice,
+        maxPrice: meta.maxPrice,
+      });
+    }
+    return list;
+  }, [displayBucketMeta, vehicleMap, vehiclePool]);
+
+  const groupsCount = buckets.length;
+  const totalCount = vehiclePool.length || totalItems;
+  const sortedBuckets = useMemo(() => {
+    const list = [...buckets];
+    const parts = sortBy.split("&");
+    const field = parts[0]?.split("=")[1];
+    const order = parts[1]?.split("=")[1];
+    const dir = order === "desc" ? -1 : 1;
+    if (field === "recent") {
+      return list.sort((a, b) => ((bucketRecentMap.get(a.key) ?? 0) - (bucketRecentMap.get(b.key) ?? 0)) * dir);
+    }
+    if (field === "price") {
+      return list.sort((a, b) => ((a.minPrice ?? 0) - (b.minPrice ?? 0)) * dir);
+    }
+    if (field === "year") {
+      return list.sort((a, b) => ((a.year ?? 0) - (b.year ?? 0)) * dir);
+    }
+    return list;
+  }, [buckets, sortBy, bucketRecentMap]);
+  const totalBucketPages = Math.max(1, Math.ceil(groupsCount / bucketPageSize));
+  const pagedBuckets = useMemo(() => {
+    const start = (bucketPage - 1) * bucketPageSize;
+    return sortedBuckets.slice(start, start + bucketPageSize);
+  }, [sortedBuckets, bucketPage, bucketPageSize]);
+
+  useEffect(() => {
+    setBucketPage(1);
+  }, [groupsCount]);
+
+  const activeBucketItems = useMemo(() => {
+    if (!openBucketKey) return [];
+    return (vehiclePool as Content[]).filter(
+      (v) => buildBucketKey(v.inventory as InventoryMaybeExtended) === openBucketKey
+    );
+  }, [openBucketKey, vehiclePool]);
+
+  const activeBucket = useMemo(() => {
+    if (!openBucketKey) return undefined;
+    const meta = displayBucketMeta.find((b) => b.bucketKey === openBucketKey);
+    const rep =
+      (meta?.representativeId && vehicleMap.get(meta.representativeId)) ||
+      (activeBucketItems[0] as Content | undefined);
+    if (!meta || !rep) return undefined;
+    let minMileage: number | undefined;
+    let maxMileage: number | undefined;
+    for (const item of activeBucketItems) {
+      const inv = item.inventory as InventoryMaybeExtended;
+      const inventoryData = (item as any)?.inventoryData ?? (inv as any)?.inventoryData;
+      const m = parseMileage(getMileage(inv, inventoryData) || "") ?? undefined;
+      if (m === undefined) continue;
+      minMileage = minMileage === undefined ? m : Math.min(minMileage, m);
+      maxMileage = maxMileage === undefined ? m : Math.max(maxMileage, m);
+    }
+    return {
+      key: meta.bucketKey,
+      brand: meta.brand,
+      model: meta.model,
+      variant: meta.variant,
+      color: meta.color,
+      year: meta.year,
+      condition: meta.condition,
+      bodyType: meta.bodyType,
+      currency: meta.currency,
+      count: meta.count,
+      representative: rep,
+      items: activeBucketItems,
+      minPrice: meta.minPrice,
+      maxPrice: meta.maxPrice,
+      minMileage,
+      maxMileage,
+    } as Bucket;
+  }, [openBucketKey, displayBucketMeta, vehicleMap, activeBucketItems]);
+
+  useEffect(() => {
+    if (!openBucketKey) return;
+    if (!displayBucketMeta.find((b) => b.bucketKey === openBucketKey)) {
+      setOpenBucketKey(null);
+    }
+  }, [openBucketKey, displayBucketMeta]);
   const sortedBucketItems = useMemo(() => {
     if (!activeBucket) return [];
     const items = [...activeBucket.items];
@@ -834,13 +895,15 @@ export default function VehicleCardListing({
     return `${Math.round(b.minMileage)} - ${Math.round(b.maxMileage)} km`;
   };
 
+  const virtualBuckets = pagedBuckets;
+
   return (
     <>
       {/* Top text */}
       <div className="flex items-center justify-between gap-4 mb-6 mt-8">
         <div className="flex items-center gap-2">
           <span className="text-sm text-[#4d4f53]">
-            <span className="font-semibold text-black">Showing {totalItems} vehicles</span>{" "}
+            <span className="font-semibold text-black">Showing {totalCount} vehicles</span>{" "}
             <span className="text-[#4d4f53]">(in {groupsCount} groups)</span>
           </span>
           <div className="relative">
@@ -871,19 +934,14 @@ export default function VehicleCardListing({
 
         {/* Remove "Showing X vehicles" from inside SortedBy.tsx if it exists */}
         <div className="w-52">
-          <SortedBy count={totalItems} handleSortChange={handleSortChange} sortBy={sortBy} />
+          <SortedBy count={totalCount} handleSortChange={handleSortChange} sortBy={sortBy} />
         </div>
       </div>
 
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {buckets.map((bucket) => {
-          const bucketAddedCount = canUseQuoteBuilder
-            ? bucket.items.reduce(
-                (acc, it) => (quoteIdSet.has(normalizeId(it.inventory.id)) ? acc + 1 : acc),
-                0
-              )
-            : 0;
+        {virtualBuckets.map((bucket) => {
+          const bucketAddedCount = bucketAddedCountMap.get(bucket.key) ?? 0;
           return (
             <VehicleCard
               key={bucket.key}
@@ -902,14 +960,30 @@ export default function VehicleCardListing({
           );
         })}
       </div>
+      <Pagination
+        className="mt-6"
+        currentPage={bucketPage}
+        totalPages={totalBucketPages}
+        onPageChange={setBucketPage}
+        pageSize={bucketPageSize}
+        totalItems={groupsCount}
+        currentCount={pagedBuckets.length}
+      />
 
       {/* Right-side modal (matching card styling inside) */}
       <SlideOver
         isOpen={!!openBucketKey}
         title={
-          activeBucket
-            ? `${activeBucket.year ?? ""} ${activeBucket.brand ?? ""} ${activeBucket.model ?? ""}`.trim()
-            : "Vehicle Group"
+          activeBucket ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="font-semibold text-black truncate">Vehicle Group Details</div>
+              <span className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[10px] font-medium text-gray-700 px-2 py-0.5 whitespace-nowrap">
+                {activeBucket.count} unit{activeBucket.count === 1 ? "" : "s"}
+              </span>
+            </div>
+          ) : (
+            "Vehicle Group Details"
+          )
         }
         onClose={() => {
           setOpenBucketKey(null);
@@ -962,10 +1036,7 @@ export default function VehicleCardListing({
                     <div className="text-base font-medium text-gray-900 truncate">
                       {activeBucket.year} {activeBucket.brand} {activeBucket.model}
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 line-clamp-2">
-                      {activeBucket.bodyType || "—"} &bull; {activeBucket.variant || "—"}
-                      {activeBucket.color ? ` &bull; ${activeBucket.color}` : ""}
-                    </div>
+                    <div className="mt-1 text-xs text-gray-500 line-clamp-2" />
                   </div>
 
                   <div className="shrink-0 text-right">
@@ -973,17 +1044,15 @@ export default function VehicleCardListing({
                       {priceRangeText(activeBucket)} <PriceBadge />
                     </div>
                     <div className="text-[11px] text-gray-500 mt-1">Price range</div>
-                    <div className="text-xs text-gray-600 mt-2">
-                      Mileage range: {mileageRangeText(activeBucket) || "—"}
-                    </div>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {activeBucket.bodyType ? <CommonPill label={`Body: ${activeBucket.bodyType}`} /> : null}
+                  {activeBucket.variant ? <CommonPill label={`Variant: ${activeBucket.variant}`} /> : null}
                   {activeBucket.color ? <CommonPill label={`Color: ${activeBucket.color}`} /> : null}
                   {activeBucket.condition ? <CommonPill label={`Grade: ${activeBucket.condition}`} /> : null}
                   {activeBucket.year ? <CommonPill label={`Year: ${activeBucket.year}`} /> : null}
-                  {activeBucket.bodyType ? <CommonPill label={`Body: ${activeBucket.bodyType}`} /> : null}
                   {mileageRangeText(activeBucket) ? <CommonPill label={`Mileage: ${mileageRangeText(activeBucket)}`} /> : null}
                 </div>
 
@@ -1021,12 +1090,9 @@ export default function VehicleCardListing({
 
             {/* Units list */}
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-gray-900">
-                  Units in this bucket ({activeBucket.count})
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-44">
+              <div className="flex flex-nowrap items-center gap-3">
+                <div className="ml-auto flex items-center gap-2 justify-end">
+                  <div className="w-56">
                     <Select
                       options={modalSortOptions}
                       value={modalSort}
@@ -1038,42 +1104,60 @@ export default function VehicleCardListing({
                       cls="w-full"
                     />
                   </div>
-                  {canUseQuoteBuilder ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        activeBucket.items.forEach((it) => {
-                          if (!quoteIdSet.has(normalizeId(it.inventory.id))) {
-                            const inv = it.inventory as InventoryMaybeExtended;
-                            const sellerId = it?.inventory?.userId || (it as any)?.user?.userId;
-                            const sellerCompany =
-                              it?.user?.roleMetaData?.companyName || it?.user?.roleMetaData?.dealershipName;
-                            addQuoteLocal({
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!allowQuoteBuilderAction()) return;
+                      const allInQuote = activeBucket.items.every((it) =>
+                        quoteIdSet.has(normalizeId(it.inventory.id))
+                      );
+                      if (allInQuote) {
+                        activeBucket.items.forEach((it) => removeQuoteLocal(it.inventory.id));
+                        return;
+                      }
+                      activeBucket.items.forEach((it) => {
+                        if (!quoteIdSet.has(normalizeId(it.inventory.id))) {
+                          const inv = it.inventory as InventoryMaybeExtended;
+                          const sellerId = it?.inventory?.userId || (it as any)?.user?.userId;
+                          const sellerCompany =
+                            it?.user?.roleMetaData?.companyName || it?.user?.roleMetaData?.dealershipName;
+                          addQuoteLocal({
+                            id: inv.id,
+                            storageItem: {
                               id: inv.id,
-                              storageItem: {
-                                id: inv.id,
-                                name: `${inv.brand ?? ""} ${inv.model ?? ""}`.trim(),
-                                year: Number(inv.year) || 0,
-                                location: `${inv.city ?? ""}${inv.country ? `, ${inv.country}` : ""}`.trim(),
-                                quantity: 1,
-                                price: Number(inv.price) || 0,
-                                currency: inv.currency || "USD",
-                                mainImageUrl: inv.mainImageUrl,
-                                sellerCompany: sellerCompany || "Unknown Seller",
-                                sellerId: sellerId,
-                                bucketKey: buildBucketKey(inv),
-                                isSelected: true,
-                              },
-                            });
-                          }
-                        });
-                      }}
-                      disabled={activeBucket.items.every((it) => quoteIdSet.has(normalizeId(it.inventory.id)))}
-                      className="h-8 px-3 rounded-md bg-brand-blue text-white hover:opacity-90 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Add all to Quote Builder
-                    </button>
-                  ) : null}
+                              name: `${inv.brand ?? ""} ${inv.model ?? ""}`.trim(),
+                              year: Number(inv.year) || 0,
+                              location: `${inv.city ?? ""}${inv.country ? `, ${inv.country}` : ""}`.trim(),
+                              quantity: 1,
+                              price: Number(inv.price) || 0,
+                              currency: inv.currency || "USD",
+                              mainImageUrl: inv.mainImageUrl,
+                              sellerCompany: sellerCompany || "Unknown Seller",
+                              sellerId: sellerId,
+                              bucketKey: buildBucketKey(inv),
+                              isSelected: true,
+                              mileage: getMileage(inv, (it as any)?.inventoryData),
+                              brand: inv.brand,
+                              model: inv.model,
+                              variant: inv.variant,
+                              color: inv.color,
+                              condition: inv.condition,
+                              bodyType: inv.bodyType,
+                            },
+                          });
+                        }
+                      });
+                    }}
+                    className={`h-8 px-3 rounded-md transition-all text-xs font-medium ${
+                      activeBucket.items.every((it) => quoteIdSet.has(normalizeId(it.inventory.id)))
+                        ? "border border-destructive text-destructive hover:bg-destructive hover:text-white"
+                        : "bg-brand-blue text-white hover:opacity-90"
+                    }`}
+                  >
+                    {activeBucket.items.every((it) => quoteIdSet.has(normalizeId(it.inventory.id)))
+                      ? "Remove all"
+                      : "Add all to Quote Builder"}
+                  </button>
                 </div>
               </div>
 
@@ -1083,7 +1167,10 @@ export default function VehicleCardListing({
                   item={it}
                   isInQuoteBuilder={canUseQuoteBuilder && quoteIdSet.has(normalizeId(it.inventory.id))}
                   canUseQuoteBuilder={canUseQuoteBuilder}
-                  onAddToQuote={addQuoteLocal}
+                  onAddToQuote={(payload) => {
+                    if (!allowQuoteBuilderAction()) return;
+                    addQuoteLocal(payload);
+                  }}
                   onRemoveFromQuote={removeQuoteLocal}
                 />
               ))}

@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import PriceBadge from "@/elements/PriceBadge";
 import type { Content } from "@/app/vehicles/page";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 type Props = Readonly<{
     item: Content;
@@ -43,6 +44,14 @@ export default function VehicleCard({
     onAddToQuote,
 }: Props) {
     const router = useRouter();
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const handleCardClick = () => {
+        if (onViewAllClick) {
+            onViewAllClick();
+            return;
+        }
+        router.push(`/vehicles/${item.inventory.id}`);
+    };
     const formatPriceNoDecimals = (value: number | string, currency = "USD") =>
         new Intl.NumberFormat("en-US", {
             style: "currency",
@@ -96,18 +105,22 @@ export default function VehicleCard({
 
     return (
         <div
-            onClick={() => router.push(`/vehicles/${item.inventory.id}`)}
+            onClick={handleCardClick}
             className="text-foreground flex flex-col gap-6 w-full max-w-sm mx-auto bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
         >
             <div className="relative">
                 <div className="relative h-48 bg-gray-100 rounded-t-xl overflow-hidden">
+                    {!imageLoaded ? <div className="absolute inset-0 bg-gray-200" aria-hidden="true" /> : null}
                     <Image
                         src={item.inventory?.mainImageUrl}
                         alt={`${item.inventory?.brand} ${item.inventory?.model}`}
                         fill={true}
                         height={168}
                         width={260}
-                        className="w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onLoadingComplete={() => setImageLoaded(true)}
+                        className={`w-full object-cover group-hover:scale-105 transition-transform duration-300 transition-opacity ${
+                            imageLoaded ? "opacity-100" : "opacity-0"
+                        }`}
                     />
 
                     <div className="absolute top-3 left-3">
@@ -145,7 +158,16 @@ export default function VehicleCard({
                 <div className="p-4 last:pb-6">
                     <div className="flex items-start justify-between gap-2 mb-2">
                         <h3 className="text-base font-medium text-gray-900 truncate w-full">
-                            <Link href={`/vehicles/${item.inventory?.brand}-${item.inventory?.model}`} onClick={(e) => e.stopPropagation()}>
+                            <Link
+                                href={`/vehicles/${item.inventory?.brand}-${item.inventory?.model}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onViewAllClick) {
+                                        e.preventDefault();
+                                        onViewAllClick();
+                                    }
+                                }}
+                            >
                                 {item.inventory?.year} {item.inventory?.brand} {item.inventory?.model}
                             </Link>
                         </h3>

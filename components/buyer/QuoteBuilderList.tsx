@@ -22,6 +22,7 @@ export type QuoteItem = {
     sellerId?: string;
     bucketKey: string;
     isSelected?: boolean;
+    mileage?: string | number;
 
     // Individual vehicle fields for grouping and display
     brand?: string;

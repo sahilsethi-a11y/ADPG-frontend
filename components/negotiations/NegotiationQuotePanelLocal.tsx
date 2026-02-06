@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import type { QuoteItem } from "@/components/buyer/QuoteBuilderList";
 import Button from "@/elements/Button";
+
+export const PORT_OPTIONS = ["Yantai", "Ningbo"];
 
 type Bucket = {
     key: string;
@@ -98,6 +100,7 @@ type Props = {
     }) => Promise<void>;
     isSubmitting?: boolean;
     submissionError?: string | null;
+    onFinalPriceDoubleTap?: () => void;
 };
 
 export default function NegotiationQuotePanelLocal({
@@ -113,8 +116,10 @@ export default function NegotiationQuotePanelLocal({
     onSubmit,
     isSubmitting,
     submissionError,
+    onFinalPriceDoubleTap,
 }: Readonly<Props>) {
     const [items, setItems] = useState<QuoteItem[]>([]);
+    const lastTapRef = useRef(0);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -248,7 +253,20 @@ export default function NegotiationQuotePanelLocal({
                 </div>
                 <div className="border-t border-blue-200 pt-2 flex justify-between text-sm font-semibold">
                     <span className="text-gray-900">Final Price:</span>
-                    <span className="text-brand-blue text-lg">{formatPrice(discountedTotal, currency)}</span>
+                    <span
+                        className="text-brand-blue text-lg"
+                        onDoubleClick={onFinalPriceDoubleTap}
+                        onTouchEnd={() => {
+                            if (!onFinalPriceDoubleTap) return;
+                            const now = Date.now();
+                            if (now - lastTapRef.current < 300) {
+                                onFinalPriceDoubleTap();
+                            }
+                            lastTapRef.current = now;
+                        }}
+                    >
+                        {formatPrice(discountedTotal, currency)}
+                    </span>
                 </div>
             </div>
 
@@ -289,8 +307,11 @@ export default function NegotiationQuotePanelLocal({
                     disabled={isDisabled}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white disabled:opacity-50"
                 >
-                    <option>Yantai</option>
-                    <option>Ningbo</option>
+                    {PORT_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                            {opt}
+                        </option>
+                    ))}
                 </select>
             </div>
 

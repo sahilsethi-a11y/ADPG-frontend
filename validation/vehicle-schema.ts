@@ -40,7 +40,7 @@ export const VehicleInfoSchema = z.object({
     registrationNumber: z.string().max(20, "Please Enter valid registration number").optional(),
     numberOfOwners: z.preprocess(Number, z.number().min(1, "Please enter number of owners").max(10, "Number of owners can not be more then 10")),
     warrantyRemaining: z.string().max(100, "Please mention in valid words").optional(),
-    inspectionReportUrl: z.string().min(1, "Please upload inspection report"),
+    inspectionReportUrl: z.string().optional().or(z.literal("")),
 });
 
 const VehiclesArraySchema = z.array(VehicleInfoSchema).superRefine((vehicles, ctx) => {
