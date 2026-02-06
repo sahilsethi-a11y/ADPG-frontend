@@ -447,7 +447,10 @@ export default function VehicleCardListing({
   totalPages,
   pageSize,
 }: Readonly<PropsT>) {
-  const { vehicles, buckets: bucketMeta } = useVehicleBuckets(querySearchParams, { refreshOnMount: false });
+  const { vehicles, buckets: bucketMeta } = useVehicleBuckets(querySearchParams, {
+    refreshOnMount: false,
+    fetchIfEmpty: true,
+  });
   const filterKeys = [
     "bodyType",
     "brand",

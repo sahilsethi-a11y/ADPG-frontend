@@ -84,7 +84,10 @@ const computeBucketsWorker = (vehicles: any[], onDone: (b: BucketMeta[]) => void
     }
 };
 
-export function useVehicleBuckets(params: Record<string, unknown>, opts?: { refreshOnMount?: boolean }) {
+export function useVehicleBuckets(
+    params: Record<string, unknown>,
+    opts?: { refreshOnMount?: boolean; fetchIfEmpty?: boolean }
+) {
     const [vehicles, setVehicles] = useState<any[]>(getMemoryVehicles()?.data ?? []);
     const [buckets, setBuckets] = useState<BucketMeta[]>(getMemoryBuckets()?.buckets ?? []);
     const [loading, setLoading] = useState(false);
@@ -131,7 +134,8 @@ export function useVehicleBuckets(params: Record<string, unknown>, opts?: { refr
         const run = async () => {
             const cached = await readVehicles();
             const shouldRefresh = opts?.refreshOnMount !== false;
-            if (shouldRefresh && (!cached || isStale(cached.updatedAt, VEHICLE_TTL_MS))) {
+            const shouldFetchIfEmpty = opts?.fetchIfEmpty && (!cached || !cached.data?.length);
+            if (shouldFetchIfEmpty || (shouldRefresh && (!cached || isStale(cached.updatedAt, VEHICLE_TTL_MS)))) {
                 setLoading(true);
                 try {
                     const { vehicles } = await fetchAllVehicles(paramsRef.current);
