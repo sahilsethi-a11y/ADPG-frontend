@@ -90,7 +90,7 @@ export async function POST(request: Request) {
             ...orders,
             [body.conversationId]: {
                 ...cart,
-                status: "placed",
+                status: "confirmed-order",
                 createdAt: new Date().toISOString(),
             },
         };

@@ -22,6 +22,7 @@ export type Cart = {
     paymentType: string;
     mainImageUrl: string;
     sellerCompany: string;
+    sellerEmail?: string;
     destinationPort: string;
     sourcePort: string;
     logistics: string;
@@ -31,8 +32,13 @@ export type Cart = {
     isSelected: boolean;
 };
 
-type NegotiationOrder = {
+export type NegotiationOrder = {
     conversationId: string;
+    buyerId?: string;
+    updatedAt?: string;
+    sellerId?: string;
+    sellerEmail?: string;
+    sellerCompany?: string;
     logisticsPartner: "UGR" | "None";
     selectedPort?: string;
     destinationPort?: string;
@@ -67,6 +73,8 @@ export default function CartList({
     onToggleNegotiation,
     onRemoveNegotiation,
     onSelectAllNegotiations,
+    onCheckout,
+    isCheckingOut,
 }: Readonly<{
     list: Cart[];
     negotiationOrders?: NegotiationOrder[];
@@ -74,6 +82,18 @@ export default function CartList({
     onToggleNegotiation?: (id: string) => void;
     onRemoveNegotiation?: (id: string) => void;
     onSelectAllNegotiations?: (value: boolean) => void;
+    onCheckout?: (payload: {
+        items: Cart[];
+        negotiationOrders: NegotiationOrder[];
+        totals: {
+            fobTotal: number;
+            logisticsFees: number;
+            negotiatedTotal: number;
+            total: number;
+        };
+        currency?: string;
+    }) => Promise<void>;
+    isCheckingOut?: boolean;
 }>) {
     const router = useRouter();
 
@@ -88,6 +108,8 @@ export default function CartList({
     const selectedItems = list.filter((i) => i.isSelected) ?? [];
     const isAllSelected = selectedItems?.length === list.length && Object.values(selectedNegotiations).every(Boolean);
     const selectedUnits = selectedItems.reduce((acc, i) => acc + i.quantity, 0);
+    const selectedNegotiationsCount = Object.values(selectedNegotiations).filter(Boolean).length;
+    const selectedItemCount = selectedItems.length + selectedNegotiationsCount;
     const fobTotal = selectedItems.reduce((acc, i) => acc + i.quantity * i.price, 0);
     const logisticsFees = selectedItems.reduce((acc, i) => acc + i.quantity * i.logisticPrice, 0);
     const negotiatedTotal = negotiationOrders.reduce(
@@ -120,6 +142,7 @@ export default function CartList({
     };
 
     const currency = list?.[0]?.currency || negotiationOrders?.[0]?.items?.[0]?.currency;
+    const selectedNegotiationOrders = negotiationOrders.filter((o) => selectedNegotiations[o.conversationId]);
 
     return (
         <div className="grid lg:grid-cols-3 gap-8">
@@ -164,7 +187,7 @@ export default function CartList({
                     <div className="space-y-4">
                         <div className="flex justify-between">
                             <span>Selected Items:</span>
-                            <span>{selectedItems?.length}</span>
+                            <span>{selectedItemCount}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>Selected Units:</span>
@@ -189,8 +212,27 @@ export default function CartList({
                             <span>{formatPrice(tatalPayable, currency)}</span>
                         </div>
                         <div className="text-xs text-gray-500 mt-2">* Token payments: Remaining balance will be collected on delivery</div>
-                        <Button disabled type="submit" fullWidth={true} size="sm">
-                            Checkout {selectedItems?.length} Item
+                        <Button
+                            disabled={selectedItemCount < 1 || !onCheckout}
+                            type="button"
+                            fullWidth={true}
+                            size="sm"
+                            loading={isCheckingOut}
+                            onClick={() =>
+                                onCheckout?.({
+                                    items: selectedItems,
+                                    negotiationOrders: selectedNegotiationOrders,
+                                    totals: {
+                                        fobTotal,
+                                        logisticsFees,
+                                        negotiatedTotal,
+                                        total: tatalPayable,
+                                    },
+                                    currency,
+                                })
+                            }
+                        >
+                            Checkout {selectedItemCount} Item
                         </Button>
                     </div>
                 </div>

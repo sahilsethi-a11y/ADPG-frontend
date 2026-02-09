@@ -12,6 +12,7 @@ type ActiveProposal = {
   remainingBalance: number;
   selectedPort: string;
   submittedAt: string;
+  status?: "buyer_proposed" | "seller_countered" | "buyer_countered" | "seller_accepted";
   bucketName: string;
   bucketTotal: number;
   bucketSummaries?: Array<{
@@ -25,11 +26,50 @@ type ActiveProposal = {
 type Props = {
   proposal: ActiveProposal;
   currency: string;
+  role?: "buyer" | "seller";
   onFinalPriceDoubleTap?: () => void;
 };
 
-export default function YourProposalSummary({ proposal, currency, onFinalPriceDoubleTap }: Props) {
+export default function YourProposalSummary({ proposal, currency, role, onFinalPriceDoubleTap }: Props) {
   const lastTapRef = useRef(0);
+  const isBuyer = role === "buyer";
+  const statusMessage = (() => {
+    if (proposal.status === "seller_countered") {
+      return isBuyer ? "Seller responded. Review and respond." : "You have responded. Waiting for buyer response.";
+    }
+    if (proposal.status === "buyer_countered") {
+      return isBuyer ? "You have responded. Waiting for seller response." : "Buyer responded. Review and respond.";
+    }
+    if (proposal.status === "buyer_proposed") {
+      return isBuyer ? "Waiting for seller response..." : "Buyer proposed. Review and respond.";
+    }
+    if (proposal.status === "seller_accepted") {
+      return isBuyer ? "Seller accepted your proposal." : "You accepted the proposal.";
+    }
+    return isBuyer ? "Waiting for seller response..." : "Waiting for buyer response...";
+  })();
+
+  const infoMessage = (() => {
+    if (proposal.status === "seller_countered") {
+      return isBuyer
+        ? "Seller has responded with a counter. Review details in the conversation."
+        : "You have responded with a counter. The buyer will see it in the conversation.";
+    }
+    if (proposal.status === "buyer_countered") {
+      return isBuyer
+        ? "You have responded with a counter. The seller will see it in the conversation."
+        : "Buyer has responded with a counter. Review details in the conversation.";
+    }
+    if (proposal.status === "seller_accepted") {
+      return isBuyer
+        ? "Your proposal was accepted. You can proceed with the next steps."
+        : "You accepted the proposal. The buyer can proceed with the next steps.";
+    }
+    return isBuyer
+      ? "Your proposal has been submitted. You can view seller responses in the conversation."
+      : "Buyer proposal submitted. You can respond in the conversation.";
+  })();
+
   return (
     <div className="border border-stroke-light rounded-lg p-5 bg-white">
       {/* Header */}
@@ -124,7 +164,7 @@ export default function YourProposalSummary({ proposal, currency, onFinalPriceDo
       {/* Status Message */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-center text-blue-700 font-medium">
-          ⏳ Waiting for seller response...
+          ⏳ {statusMessage}
         </p>
         <p className="text-xs text-center text-blue-600 mt-1">
           Submitted at {new Date(proposal.submittedAt).toLocaleString()}
@@ -133,7 +173,7 @@ export default function YourProposalSummary({ proposal, currency, onFinalPriceDo
 
       {/* Info Text */}
       <p className="text-xs text-gray-500 text-center mt-4">
-        Your proposal has been submitted. You can view seller responses in the conversation.
+        {infoMessage}
       </p>
     </div>
   );

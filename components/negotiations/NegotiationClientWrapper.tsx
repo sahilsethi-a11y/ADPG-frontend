@@ -253,7 +253,10 @@ export default function NegotiationClientWrapper({
                 if (data?.proposal) {
                     setActiveProposal(data.proposal as ActiveProposal);
                     setUiStatus("BUYER_PROPOSED");
-                    setStateFromProposal(data.proposal as ActiveProposal);
+                    // Avoid overwriting local edits while countering
+                    if (!isCountering) {
+                        setStateFromProposal(data.proposal as ActiveProposal);
+                    }
                 }
             } catch {}
         };
@@ -263,7 +266,7 @@ export default function NegotiationClientWrapper({
             isActive = false;
             window.clearInterval(interval);
         };
-    }, [conversationId]);
+    }, [conversationId, isCountering, setStateFromProposal]);
 
     useEffect(() => {
         if (!selectedPort) {
@@ -424,6 +427,7 @@ export default function NegotiationClientWrapper({
                     conversationId,
                     buyerId: userId,
                     sellerId,
+                    sellerCompany: sellerName,
                     vehicleId,
                     logisticsPartner,
                     items,
@@ -567,6 +571,7 @@ export default function NegotiationClientWrapper({
                         <YourProposalSummary
                             proposal={activeProposal}
                             currency={currency || "USD"}
+                            role={isBuyer ? "buyer" : isSeller ? "seller" : undefined}
                             onFinalPriceDoubleTap={() => setIsRoleToggleEnabled((prev) => !prev)}
                         />
                         {activeProposal.status === "seller_accepted" && isBuyer && vehicleId ? (
