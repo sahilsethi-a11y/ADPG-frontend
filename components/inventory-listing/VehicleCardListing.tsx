@@ -342,7 +342,11 @@ function UnitCardRow({
   return (
     <div
       className="text-foreground flex w-full bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-stroke-light cursor-pointer"
-      onClick={() => router.push(`/vehicles/${inv.id}`)}
+      onClick={() => {
+        const sellerId = item?.inventory?.userId || (item as any)?.user?.userId;
+        const query = sellerId ? `?sellerId=${encodeURIComponent(sellerId)}` : "";
+        router.push(`/vehicles/${inv.id}${query}`);
+      }}
     >
       {/* Thumbnail block like card image */}
       <div className="relative h-24 w-32 bg-gray-100 overflow-hidden shrink-0">

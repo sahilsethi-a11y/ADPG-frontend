@@ -220,7 +220,11 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
                             </div>
                             {seller.sellerId && seller.representativeVehicleId ? (
                                 <div className="w-36">
-                                    <NegotiatePriceButton vehicleId={seller.representativeVehicleId} peerId={seller.sellerId} />
+                                    <NegotiatePriceButton
+                                        vehicleId={seller.representativeVehicleId}
+                                        peerId={seller.sellerId}
+                                        sellerName={seller.sellerCompany}
+                                    />
                                 </div>
                             ) : (
                                 <div className="w-36">

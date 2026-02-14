@@ -33,8 +33,17 @@ type Data = {
     isFavourite: boolean;
 };
 
-export default async function page({ params }: { params: Promise<{ vehicleSlug: string }> }) {
+export default async function page({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ vehicleSlug: string }>;
+    searchParams?: Promise<{ sellerId?: string }>;
+}) {
     const { vehicleSlug } = await params;
+    const resolvedSearchParams = await searchParams;
+    const sellerIdFromQuery =
+        typeof resolvedSearchParams?.sellerId === "string" ? decodeURIComponent(resolvedSearchParams.sellerId) : undefined;
 
     const res = await api.get<{ data: Data }>("/inventory/api/v1/inventory/getInventoryDetails", { params: { id: vehicleSlug } });
     const data = res.data;
@@ -49,7 +58,7 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
         currency: data.currency || "USD",
         mainImageUrl: data.imageUrls?.[0] || "",
         sellerCompany: data.sellerInformation?.name || "Unknown Seller",
-        sellerId: data.sellerInformation?.id,
+        sellerId: data.sellerInformation?.id || sellerIdFromQuery,
         bucketKey: [data.name, data.price, data.currency].join("|"),
         isSelected: true,
         mileage,
@@ -126,13 +135,6 @@ export default async function page({ params }: { params: Promise<{ vehicleSlug: 
                                     </div>
                                     <div className="text-[16px] text-[#4d4f53] mb-6">{data.name}</div>
                                     <div className="mb-6 flex flex-col gap-3">
-                                        <AddToCartButton
-                                            vehicleId={vehicleSlug}
-                                            storageItem={storageItem}
-                                            sellerId={data.sellerInformation.id}
-                                            sellerCompany={data.sellerInformation.name}
-                                            label="Add to Quote Builder"
-                                        />
                                         {vin ? (
                                             <a
                                                 href={`https://report.adpgauto.com/${encodeURIComponent(vin)}`}

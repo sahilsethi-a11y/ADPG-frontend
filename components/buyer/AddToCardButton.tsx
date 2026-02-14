@@ -146,7 +146,12 @@ export default function AddToCartButton({
             const parsedItems = rawItems ? (JSON.parse(rawItems) as any[]) : [];
             if (storageItem) {
                 const filtered = parsedItems.filter((i) => i?.id !== storageItem.id);
-                filtered.push({ ...storageItem, isSelected: storageItem.isSelected ?? true });
+                filtered.push({
+                    ...storageItem,
+                    sellerId: storageItem.sellerId ?? sellerId,
+                    sellerCompany: storageItem.sellerCompany ?? sellerCompany ?? "Unknown Seller",
+                    isSelected: storageItem.isSelected ?? true,
+                });
                 window.localStorage.setItem(quoteItemsStorageKey, JSON.stringify(filtered));
             }
 

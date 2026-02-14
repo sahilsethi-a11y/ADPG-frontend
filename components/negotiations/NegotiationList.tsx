@@ -19,6 +19,8 @@ export type Content = {
     updatedAt: string;
     roleType: string;
     name: string;
+    buyerName?: string;
+    sellerName?: string;
     lastActivity: string;
     status: string;
     startedAt: string;
@@ -79,6 +81,9 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
     const [extraNegotiations, setExtraNegotiations] = useState<Content[]>([]);
     const [proposalStatusMap, setProposalStatusMap] = useState<Record<string, string>>({});
     const [proposalMap, setProposalMap] = useState<Record<string, any>>({});
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [hasLoadedPrimary, setHasLoadedPrimary] = useState(false);
+    const [hasLoadedFallback, setHasLoadedFallback] = useState(false);
 
     const [query, setQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState(filters[0].value);
@@ -136,7 +141,22 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
     }, [activeFilter, query, initialData.currentPage, initialData.size]);
 
     useEffect(() => {
-        const role = roleType?.toLowerCase() === "seller" ? "seller" : "buyer";
+        let isActive = true;
+        const loadPrimary = async () => {
+            try {
+                await applyFilter(initialData.currentPage, initialData.size);
+            } finally {
+                if (isActive) setHasLoadedPrimary(true);
+            }
+        };
+        loadPrimary();
+        return () => {
+            isActive = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const role = roleType?.toLowerCase() === "buyer" ? "buyer" : "seller";
         const loadFallback = async () => {
             try {
                 const res = await fetch(`/api/negotiation-index?userId=${encodeURIComponent(userId)}&role=${role}`, {
@@ -185,6 +205,8 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                                 startedAt: i.startedAt || "",
                                 message: i.message || "New negotiation started",
                                 agreedPrice: i.agreedPrice,
+                                buyerName: i.buyerName,
+                                sellerName: i.sellerName,
                                 vehicle: vehicle as any,
                             } as Content;
                         })
@@ -192,9 +214,14 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
 
                 setExtraNegotiations(fallback.filter((i) => i?.vehicle));
             } catch {}
+            setHasLoadedFallback(true);
         };
         loadFallback();
     }, [data, roleType, userId]);
+
+    useEffect(() => {
+        if (hasLoadedPrimary && hasLoadedFallback) setIsInitialLoading(false);
+    }, [hasLoadedPrimary, hasLoadedFallback]);
 
     useEffect(() => {
         const ids = [...new Set([...extraNegotiations, ...(data?.content ?? [])].map((i) => i.conversationId).filter(Boolean))];
@@ -256,12 +283,30 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                         const bt = new Date((b.startedAt || b.updatedAt) ?? 0).getTime();
                         return bt - at;
                     })
-                    .map((i) => (
+                    .map((i) => {
+                        const altText = [i.vehicle.year, i.vehicle.brand, i.vehicle.model, i.vehicle.variant]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim() || "Vehicle image";
+                        const currentRole = i.roleType?.toLowerCase();
+                        const normalizedName = (i.name || "").trim();
+                        const isGenericName = normalizedName.toLowerCase() === "buyer" || normalizedName.toLowerCase() === "seller";
+                        const peerName = !isGenericName && normalizedName ? normalizedName : undefined;
+                        const buyerLabel = i.buyerName || (currentRole === "seller" ? peerName : undefined) || "Buyer";
+                        const sellerLabel = i.sellerName || (currentRole === "buyer" ? peerName : undefined) || "Seller";
+                        return (
                     <div
                         key={i.conversationId}
                         className="grid grid-cols-[80px_1fr] md:grid-cols-[80px_1fr_250px] gap-2 md:gap-4 rounded-xl p-4 border-stroke-light border hover:shadow-md transition-shadow">
                         <div className="w-20 h-16 relative">
-                            <Image src={i.vehicle.mainImageUrl || i.vehicle.imageUrls?.[0]} alt={i.vehicle.brand} fill height={70} width={56} className="rounded-lg" />
+                            <Image
+                                src={i.vehicle.mainImageUrl || i.vehicle.imageUrls?.[0]}
+                                alt={altText}
+                                fill
+                                height={70}
+                                width={56}
+                                className="rounded-lg"
+                            />
                         </div>
                         <div>
                             <h3 className="text-lg text-brand-blue truncate">
@@ -270,7 +315,11 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                             <div className="flex flex-col items-center gap-2 text-sm text-gray-600 mb-1 md:flex-row">
                                 <span className="flex items-center gap-1">
                                     <UserIcon className="h-3 w-3" />
-                                    {i.roleType}: {i.name}
+                                    Buyer: {buyerLabel}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <UserIcon className="h-3 w-3" />
+                                    Seller: {sellerLabel}
                                 </span>
                                 <span className="flex items-center gap-1">
                                     <ClockIcon className="h-3 w-3" />
@@ -311,17 +360,23 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                         <div className="flex gap-2 justify-between md:flex-col md:items-end">
                             <StatusBadge status={i.status} proposalStatus={proposalStatusMap[i.conversationId]} />
                             <div className="flex gap-2">
-                                <Button onClick={() => navigateToDetail(i)} variant="outline" size="sm">
-                                    View Details
-                                </Button>
                                 <Button onClick={() => navigateToConversation(i)} size="sm">
                                     Continue Chat
                                 </Button>
                             </div>
                         </div>
                     </div>
-                ))}
+                );
+                })}
             </div>
+            {isInitialLoading ? (
+                <div className="fixed inset-0 z-30 flex items-center justify-center bg-white/70">
+                    <div className="flex items-center gap-3 rounded-lg border border-stroke-light bg-white px-4 py-3 shadow-sm text-sm text-gray-700">
+                        <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-brand-blue border-t-transparent" />
+                        Loading negotiations...
+                    </div>
+                </div>
+            ) : null}
             <Pagination
                 className="mt-8"
                 currentPage={data.currentPage}

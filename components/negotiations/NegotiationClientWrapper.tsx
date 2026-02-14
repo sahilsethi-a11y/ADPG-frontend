@@ -11,6 +11,7 @@ import { formatPrice } from "@/lib/utils";
 import Image from "@/elements/Image";
 import { api } from "@/lib/api/client-request";
 import { useRouter } from "next/navigation";
+import message from "@/elements/message";
 
 type Props = {
     negotiationStatus?: string;
@@ -102,8 +103,9 @@ export default function NegotiationClientWrapper({
     const [demoRole, setDemoRole] = useState<string | undefined>(role);
     const [isRoleToggleEnabled, setIsRoleToggleEnabled] = useState(false);
     const effectiveRole = enableRoleToggle && isRoleToggleEnabled ? demoRole : role;
-    const isBuyer = effectiveRole?.toLowerCase() === "buyer";
-    const isSeller = effectiveRole?.toLowerCase() === "seller";
+    const normalizedRole = effectiveRole?.toLowerCase();
+    const isBuyer = normalizedRole === "buyer";
+    const isSeller = normalizedRole === "seller" || normalizedRole === "dealer";
     const canEditDiscounts = isBuyer || isCountering;
 
     const setStateFromProposal = useCallback((proposal: ActiveProposal) => {
@@ -206,6 +208,12 @@ export default function NegotiationClientWrapper({
 
                 const result = await saveProposal(proposal);
                 if (!result.ok) {
+                    console.error("Failed to submit negotiation proposal", {
+                        conversationId,
+                        status,
+                        error: result.error,
+                    });
+                    message.error("Proposal submission failed. Please try again.");
                     setSubmissionError(`Failed to submit proposal. ${result.error || "Please try again."}`);
                     setUiStatus("IDLE");
                     setActiveProposal(null);
@@ -229,7 +237,9 @@ export default function NegotiationClientWrapper({
 
                 setSubmissionError(null);
                 setIsSubmitting(false);
-            } catch {
+            } catch (err) {
+                console.error("Proposal submission error", { conversationId, error: err });
+                message.error("Proposal submission failed. Please try again.");
                 setSubmissionError("Network error. Please try again.");
                 setUiStatus("IDLE");
                 setActiveProposal(null);
@@ -279,13 +289,17 @@ export default function NegotiationClientWrapper({
         if (!isSeller || !activeProposal || !conversationId) return;
         if (!activeProposal.bucketSummaries || activeProposal.bucketSummaries.length === 0) return;
         try {
-            const items = activeProposal.bucketSummaries.map((b) => ({
+            const items = activeProposal.bucketSummaries.map((b) => {
+                const totalUnits = Number(b.totalUnits) || 0;
+                const bucketTotal = Number(b.total) || 0;
+                const unitPrice = totalUnits > 0 ? bucketTotal / totalUnits : Number(b.unitPrice) || 0;
+                return ({
                 id: `${conversationId}_${b.key}`,
                 name: b.name,
                 year: b.year ?? 0,
                 location: "",
-                quantity: b.totalUnits,
-                price: b.unitPrice,
+                quantity: totalUnits,
+                price: unitPrice,
                 currency: b.currency,
                 mainImageUrl: b.mainImageUrl || "",
                 sellerCompany: sellerName || "Seller",
@@ -298,7 +312,8 @@ export default function NegotiationClientWrapper({
                 color: b.color,
                 condition: b.condition,
                 bodyType: b.bodyType,
-            }));
+            });
+            });
             const scopedKey = `negotiationItems_${conversationId}`;
             window.localStorage.setItem(scopedKey, JSON.stringify(items));
             window.dispatchEvent(new Event("quoteBuilderUpdated"));

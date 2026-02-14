@@ -16,7 +16,11 @@ type User = {
     otpVerified: boolean;
 };
 
-export default function NegotiatePriceButton({ vehicleId, peerId }: Readonly<{ vehicleId: string; peerId: string }>) {
+export default function NegotiatePriceButton({
+    vehicleId,
+    peerId,
+    sellerName,
+}: Readonly<{ vehicleId: string; peerId: string; sellerName?: string }>) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [disabled, setDisabled] = useState(false);
@@ -35,6 +39,7 @@ export default function NegotiatePriceButton({ vehicleId, peerId }: Readonly<{ v
             const userData = await api.get<{ data: User }>("/api/v1/auth/getUserInfoByToken");
 
             if (userData.data?.roleType?.toLocaleLowerCase() === "buyer") {
+                const buyerName = userData.data?.name || userData.data?.username;
                 const conversationId = createConversationId(userData.data.userId);
                 fetch("/api/negotiation-index", {
                     method: "POST",
@@ -46,6 +51,8 @@ export default function NegotiatePriceButton({ vehicleId, peerId }: Readonly<{ v
                             sellerId: peerId,
                             itemId: vehicleId,
                             roleType: "buyer",
+                            buyerName,
+                            sellerName,
                         },
                     }),
                 }).catch(() => {});
