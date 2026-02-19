@@ -34,8 +34,8 @@ export default async function Header() {
             <div className="container mx-auto px-4 lg:px-6">
                 <div className="flex items-center justify-between py-2.5 gap-2">
                     <Link title="Global Automotive" href="/" className="h-[35px] md:h-[40px] w-[230px] md:w-[320px] overflow-hidden">
-                        <Image className="h-full w-auto hidden md:block origin-left scale-[1.35]" alt="Global Automotive" width={294} height={51} src="/assets/logo-20260219.png" preload />
-                        <Image className="h-full w-auto md:hidden origin-left scale-[1.35]" alt="Global Automotive" width={294} height={51} src="/assets/logo-20260219.png" preload />
+                        <Image className="h-full w-auto hidden md:block origin-left scale-[1.35]" alt="Global Automotive" width={294} height={51} src="/assets/logo-20260219.png" preload unoptimized />
+                        <Image className="h-full w-auto md:hidden origin-left scale-[1.35]" alt="Global Automotive" width={294} height={51} src="/assets/logo-20260219.png" preload unoptimized />
                     </Link>
                     <DesktopNav isLoggedIn={userData.data?.userId} />
                     <div className="flex gap-2 md:gap-4 items-center">
