@@ -1,0 +1,529 @@
+{
+  "auth": {
+    "user": {
+      "userId": "proto-user-001",
+      "id": "proto-user-001",
+      "name": "Prototype User",
+      "username": "prototype.user",
+      "email": "prototype@adpgauto.com",
+      "emailId": "prototype@adpgauto.com",
+      "roleType": "buyer",
+      "otpVerified": true,
+      "passwordTemporary": false
+    }
+  },
+  "masters": {
+    "brands": [
+      { "id": "b1", "name": "Toyota", "displayName": "Toyota" },
+      { "id": "b2", "name": "Nissan", "displayName": "Nissan" },
+      { "id": "b3", "name": "Mercedes", "displayName": "Mercedes" }
+    ],
+    "models": [
+      { "id": "m1", "modelId": "m1", "modelName": "Land Cruiser", "displayName": "Land Cruiser" },
+      { "id": "m2", "modelId": "m2", "modelName": "Patrol", "displayName": "Patrol" },
+      { "id": "m3", "modelId": "m3", "modelName": "C-Class", "displayName": "C-Class" }
+    ],
+    "variants": [
+      { "id": "v1", "variantName": "VX", "oemId": "o1", "modelId": "m1" },
+      { "id": "v2", "variantName": "LE", "oemId": "o2", "modelId": "m2" }
+    ],
+    "filters": {
+      "country": [
+        { "label": "UAE", "value": "AE" },
+        { "label": "Saudi Arabia", "value": "SA" }
+      ],
+      "bodyType": [
+        { "label": "SUV", "value": "SUV" },
+        { "label": "Sedan", "value": "Sedan" }
+      ],
+      "priceRange": [
+        { "label": "0 - 20,000", "value": "0-20000" },
+        { "label": "20,000 - 60,000", "value": "20000-60000" },
+        { "label": "60,000+", "value": "60000+" }
+      ],
+      "currency": [
+        { "label": "US Dollar", "value": "USD", "symbol": "$" },
+        { "label": "UAE Dirham", "value": "AED", "symbol": "AED" }
+      ],
+      "sellerTypeOptions": [
+        { "label": "Dealer", "value": "dealer" },
+        { "label": "Seller", "value": "seller" },
+        { "label": "Buyer", "value": "buyer" }
+      ],
+      "colors": [
+        { "label": "White", "value": "White", "hex": "#ffffff" },
+        { "label": "Black", "value": "Black", "hex": "#111827" },
+        { "label": "Silver", "value": "Silver", "hex": "#9ca3af" }
+      ],
+      "fuelTypeOptions": [
+        { "label": "Petrol", "value": "Petrol" },
+        { "label": "Diesel", "value": "Diesel" },
+        { "label": "Hybrid", "value": "Hybrid" }
+      ],
+      "drivetrainOptions": [
+        { "label": "AWD", "value": "AWD" },
+        { "label": "RWD", "value": "RWD" }
+      ],
+      "regionalSpecsOptions": [
+        { "label": "GCC", "value": "GCC" },
+        { "label": "US", "value": "US" }
+      ],
+      "transmissionOptions": [
+        { "label": "Automatic", "value": "Automatic" },
+        { "label": "Manual", "value": "Manual" }
+      ],
+      "bodyConditionOptions": [
+        { "label": "Used", "value": "Used" },
+        { "label": "New", "value": "New" }
+      ],
+      "fuelType": [
+        { "label": "Petrol", "value": "Petrol" },
+        { "label": "Diesel", "value": "Diesel" }
+      ],
+      "drivetrain": [
+        { "label": "AWD", "value": "AWD" },
+        { "label": "RWD", "value": "RWD" }
+      ],
+      "regionalSpecs": [
+        { "label": "GCC", "value": "GCC" },
+        { "label": "US", "value": "US" }
+      ],
+      "transmission": [
+        { "label": "Automatic", "value": "Automatic" },
+        { "label": "Manual", "value": "Manual" }
+      ],
+      "condition": [
+        { "label": "Used", "value": "Used" },
+        { "label": "New", "value": "New" }
+      ],
+      "color": [
+        { "label": "White", "value": "White" },
+        { "label": "Black", "value": "Black" }
+      ]
+    },
+    "locations": {
+      "roots": [{ "id": "root-1" }],
+      "children": [
+        { "id": "loc-1", "name": "Abu Dhabi" },
+        { "id": "loc-2", "name": "Dubai" },
+        { "id": "loc-3", "name": "Sharjah" }
+      ]
+    }
+  },
+  "inventory": {
+    "listing": {
+      "content": [
+        {
+          "id": "inv-row-1",
+          "inventory": {
+            "id": "veh-001",
+            "brand": "Toyota",
+            "model": "Land Cruiser",
+            "variant": "VX",
+            "condition": "Used",
+            "year": 2021,
+            "bodyType": "SUV",
+            "city": "Abu Dhabi",
+            "country": "UAE",
+            "fuelType": "Petrol",
+            "transmission": "Automatic",
+            "mainImageUrl": "/assets/car.avif",
+            "bulkPurchaseAvailable": true,
+            "vehicleUrl": "",
+            "price": "45000",
+            "userId": "seller-001",
+            "inventoryList": [],
+            "views": "130",
+            "currency": "USD",
+            "regionalSpecs": "GCC",
+            "allowPriceNegotiations": true,
+            "status": "LIVE",
+            "createTime": "2026-01-15"
+          },
+          "user": {
+            "name": "Al Noor Motors",
+            "roleType": "Dealer",
+            "userId": "seller-001",
+            "organisationName": "Al Noor Motors",
+            "locationAttribute": {
+              "countryCode": "AE",
+              "country": "UAE",
+              "city": "Abu Dhabi",
+              "district": "Al Zahiyah"
+            },
+            "profileSetting": {
+              "businessCompanyName": "Al Noor Motors"
+            },
+            "roleMetaData": {
+              "companyName": "Al Noor Motors",
+              "dealershipName": "Al Noor Motors"
+            }
+          },
+          "isFavourite": false
+        },
+        {
+          "id": "inv-row-2",
+          "inventory": {
+            "id": "veh-002",
+            "brand": "Nissan",
+            "model": "Patrol",
+            "variant": "LE",
+            "condition": "Used",
+            "year": 2020,
+            "bodyType": "SUV",
+            "city": "Dubai",
+            "country": "UAE",
+            "fuelType": "Petrol",
+            "transmission": "Automatic",
+            "mainImageUrl": "/assets/elite.jpeg",
+            "bulkPurchaseAvailable": false,
+            "vehicleUrl": "",
+            "price": "52000",
+            "userId": "seller-002",
+            "inventoryList": [],
+            "views": "88",
+            "currency": "USD",
+            "regionalSpecs": "GCC",
+            "allowPriceNegotiations": true,
+            "status": "LIVE",
+            "createTime": "2026-01-10"
+          },
+          "user": {
+            "name": "Gulf Auto",
+            "roleType": "Seller",
+            "userId": "seller-002",
+            "organisationName": "Gulf Auto",
+            "locationAttribute": {
+              "countryCode": "AE",
+              "country": "UAE",
+              "city": "Dubai",
+              "district": "Al Quoz"
+            },
+            "profileSetting": {
+              "businessCompanyName": "Gulf Auto"
+            },
+            "roleMetaData": {
+              "companyName": "Gulf Auto",
+              "dealershipName": "Gulf Auto"
+            }
+          },
+          "isFavourite": true
+        }
+      ],
+      "totalItems": 2,
+      "totalElements": 2,
+      "totalPages": 1,
+      "size": 10,
+      "last": true,
+      "first": true,
+      "currentPage": 1
+    },
+    "details": {
+      "id": "veh-001",
+      "imageUrls": ["/assets/car.avif", "/assets/elite.jpeg", "/assets/vehicle-assessment.jpeg"],
+      "name": "2021 Toyota Land Cruiser VX",
+      "price": "45000",
+      "description": "Well-maintained SUV with service history and inspection completed.",
+      "currency": "USD",
+      "condition": "Used",
+      "features": ["Leather Seats", "Navigation", "Bluetooth", "Parking Sensors"],
+      "sellerInformation": {
+        "id": "seller-001",
+        "name": "Al Noor Motors",
+        "address": "Abu Dhabi, UAE"
+      },
+      "vehicleDetails": [
+        {
+          "id": "veh-001-unit-1",
+          "mileage": "42000 km",
+          "numberOfOwners": "1",
+          "warrantyRemaining": "6 months",
+          "inspectionReportUrl": ""
+        }
+      ],
+      "specificationIcons": [
+        { "key": "Engine", "value": "4.0L", "icon": "/assets/car.svg" },
+        { "key": "Fuel", "value": "Petrol", "icon": "/assets/dollar.svg" },
+        { "key": "Drive", "value": "AWD", "icon": "/assets/target.svg" }
+      ],
+      "isFavourite": false,
+      "brand": "Toyota",
+      "model": "Land Cruiser",
+      "variant": "VX",
+      "year": 2021,
+      "bodyType": "SUV"
+    },
+    "sellerInfo": {
+      "userInformation": {
+        "totalInventory": "12",
+        "locationAttribute": {
+          "countryCode": "AE",
+          "country": "UAE",
+          "city": "Abu Dhabi",
+          "district": "Al Zahiyah"
+        },
+        "organizationName": "Al Noor Motors"
+      },
+      "about": {
+        "bannerImage": "/assets/uae-national-bank.jpeg",
+        "specialties": ["Luxury Vehicles", "SUV"],
+        "description": "Trusted dealer with premium inventory and transparent process.",
+        "businessCompanyName": "Al Noor Motors",
+        "workingHours": "Sun - Thu, 9:00 AM - 6:00 PM"
+      }
+    },
+    "favourites": {
+      "content": [
+        {
+          "id": "fav-001",
+          "inventory": {
+            "id": "veh-002",
+            "year": "2020",
+            "brand": "Nissan",
+            "model": "Patrol",
+            "city": "Dubai",
+            "country": "UAE",
+            "currency": "USD",
+            "price": "52000",
+            "status": "LIVE",
+            "mainImageUrl": "/assets/elite.jpeg"
+          }
+        }
+      ],
+      "totalItems": 1
+    },
+    "cart": [
+      {
+        "cartId": "cart-001",
+        "name": "2021 Toyota Land Cruiser VX",
+        "year": 2021,
+        "location": "Abu Dhabi, UAE",
+        "quantity": 1,
+        "price": 45000,
+        "remainingPrice": 44000,
+        "paymentType": "Token Payment",
+        "mainImageUrl": "/assets/car.avif",
+        "sellerCompany": "Al Noor Motors",
+        "sellerEmail": "sales@alnoormotors.com",
+        "destinationPort": "Jeddah",
+        "sourcePort": "Abu Dhabi",
+        "logistics": "UGR",
+        "currency": "USD",
+        "logisticPrice": 750,
+        "inventorySize": 1,
+        "isSelected": true
+      }
+    ],
+    "profileAnalytics": {
+      "dashboard": {
+        "totalInventory": 12,
+        "revenueGenerated": 840000,
+        "performanceOverview": 72,
+        "pendingDeliveries": 3,
+        "activeOrders": 6
+      }
+    }
+  },
+  "users": {
+    "buyerProfile": {
+      "name": "Prototype User",
+      "email": "prototype@adpgauto.com",
+      "phoneNumber": "+971 50 123 4567",
+      "address": "Abu Dhabi, UAE"
+    },
+    "profileSettings": {
+      "profileSetting": {
+        "bannerImage": "/assets/get-started-banner.webp",
+        "website": "https://adpgauto.com",
+        "specialties": ["Luxury Vehicles", "SUV", "Fleet Sales"],
+        "description": "Seller profile for prototype mode.",
+        "businessCompanyName": "ADPG Auto",
+        "workingHours": "Sun - Thu, 9:00 AM - 6:00 PM"
+      },
+      "userId": "proto-user-001"
+    },
+    "bankDetails": {
+      "bankName": "UAE National Bank",
+      "accountNumber": "1234567890",
+      "iban": "AE070331234567890123456",
+      "swiftCode": "AEBANKXX"
+    },
+    "list": {
+      "content": [
+        {
+          "id": "user-001",
+          "name": "Aisha Khan",
+          "type": "Buyer",
+          "active": true,
+          "emailId": "aisha@example.com",
+          "roleType": "Buyer",
+          "phoneNumber": "+971501111111",
+          "createDate": "2025-01-01",
+          "roleId": "buyer",
+          "passwordTemporary": false,
+          "roleMetaData": {
+            "companyLicenseUrl": "",
+            "address": "Abu Dhabi",
+            "dob": "1990-01-01",
+            "exportLicenseUrl": ""
+          }
+        }
+      ],
+      "currentPage": 1,
+      "totalPages": 1,
+      "size": 10,
+      "totalItems": 1
+    }
+  },
+  "analytics": {
+    "dashboard": {
+      "activeListing": 128,
+      "platformRevenue": 458000,
+      "totalUsers": 3200,
+      "pendingVerifications": 18
+    }
+  },
+  "chat": {
+    "negotiations": {
+      "content": [
+        {
+          "conversationId": "proto-user-001_seller-001_veh-001",
+          "userId": "proto-user-001",
+          "peerId": "seller-001",
+          "itemId": 1,
+          "updatedAt": "2026-02-10",
+          "roleType": "buyer",
+          "name": "Prototype User",
+          "buyerName": "Prototype User",
+          "sellerName": "Al Noor Motors",
+          "lastActivity": "2026-02-10",
+          "status": "ongoing",
+          "startedAt": "2026-02-01",
+          "message": "Can you offer better pricing?",
+          "agreedPrice": "44500",
+          "vehicle": {
+            "id": "veh-001",
+            "brand": "Toyota",
+            "model": "Land Cruiser",
+            "variant": "VX",
+            "year": 2021,
+            "price": 45000,
+            "currency": "USD",
+            "allowPriceNegotiations": true,
+            "mainImageUrl": "/assets/car.avif",
+            "createTime": "2026-01-31",
+            "imageUrls": ["/assets/car.avif"]
+          }
+        }
+      ],
+      "currentPage": 1,
+      "first": true,
+      "last": true,
+      "size": 10,
+      "totalItems": 1,
+      "totalPages": 1
+    },
+    "conversation": {
+      "vehicle": {
+        "id": "veh-001",
+        "brand": "Toyota",
+        "model": "Land Cruiser",
+        "variant": "VX",
+        "currency": "USD",
+        "mainImageUrl": "/assets/car.avif",
+        "imageUrls": ["/assets/car.avif"],
+        "price": 45000,
+        "status": "LIVE",
+        "year": "2021"
+      },
+      "conversation": {
+        "chats": [
+          {
+            "senderId": "proto-user-001",
+            "content": "Is this available?",
+            "id": "msg-1",
+            "conversationId": "proto-user-001_seller-001_veh-001",
+            "createdAt": "2026-02-10T10:10:00Z",
+            "name": "Prototype User",
+            "contentType": "chat"
+          },
+          {
+            "senderId": "seller-001",
+            "content": "Yes, available.",
+            "id": "msg-2",
+            "conversationId": "proto-user-001_seller-001_veh-001",
+            "createdAt": "2026-02-10T10:11:00Z",
+            "name": "Al Noor Motors",
+            "contentType": "chat"
+          }
+        ]
+      },
+      "user": {
+        "organisationName": "Al Noor Motors"
+      },
+      "negotiationInfo": {
+        "started": "2026-02-01",
+        "lastActivity": "2026-02-10",
+        "status": "ongoing",
+        "agreedPrice": "",
+        "agreedPriceLocked": false,
+        "userPrice": "44500",
+        "userPriceLocked": false,
+        "roleType": "buyer"
+      }
+    }
+  },
+  "state": {
+    "negotiationIndex": [
+      {
+        "conversationId": "proto-user-001_seller-001_veh-001",
+        "buyerId": "proto-user-001",
+        "sellerId": "seller-001",
+        "userId": "proto-user-001",
+        "peerId": "seller-001",
+        "itemId": "veh-001",
+        "updatedAt": "2026-02-10T10:00:00Z"
+      }
+    ],
+    "negotiationProposals": {
+      "proto-user-001_seller-001_veh-001": {
+        "status": "pending",
+        "discountPercent": 2
+      }
+    },
+    "negotiationCart": [
+      {
+        "conversationId": "proto-user-001_seller-001_veh-001",
+        "buyerId": "proto-user-001",
+        "sellerId": "seller-001",
+        "logisticsPartner": "UGR",
+        "selectedPort": "Abu Dhabi",
+        "destinationPort": "Jeddah",
+        "items": [
+          {
+            "bucketKey": "Toyota|Land Cruiser|VX|2021",
+            "name": "2021 Toyota Land Cruiser VX",
+            "totalUnits": 1,
+            "unitPrice": 45000,
+            "currency": "USD",
+            "discountPercent": 2,
+            "total": 44100,
+            "mainImageUrl": "/assets/car.avif",
+            "year": 2021,
+            "color": "White",
+            "variant": "VX",
+            "condition": "Used",
+            "bodyType": "SUV"
+          }
+        ],
+        "totals": {
+          "total": 44100,
+          "downpayment": 1000,
+          "pending": 43100
+        },
+        "updatedAt": "2026-02-10T10:00:00Z"
+      }
+    ],
+    "negotiationOrders": []
+  }
+}

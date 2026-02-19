@@ -31,6 +31,7 @@ type PropsT = {
   totalPages: number;
   pageSize: number;
   cartInventoryIds?: string[];
+  sellerId?: string;
 };
 
 type InventoryMaybeExtended = Content["inventory"] & {
@@ -450,6 +451,7 @@ export default function VehicleCardListing({
   totalItems,
   totalPages,
   pageSize,
+  sellerId,
 }: Readonly<PropsT>) {
   const { vehicles, buckets: bucketMeta } = useVehicleBuckets(querySearchParams, {
     refreshOnMount: false,
@@ -476,8 +478,12 @@ export default function VehicleCardListing({
   const hasFilters = useMemo(() => hasActiveFilter(querySearchParams, filterKeys), [querySearchParams]);
 
   const filteredVehicles = useMemo(() => {
-    const list = vehicles as Content[];
-    if (!hasFilters) return list;
+    const baseList = (vehicles as Content[]).filter((item) => {
+      if (!sellerId) return true;
+      const itemSellerId = item?.inventory?.userId ?? (item as any)?.user?.userId;
+      return String(itemSellerId ?? "") === String(sellerId);
+    });
+    if (!hasFilters) return baseList;
 
     const bodyType = normalize(getParamValues(querySearchParams, "bodyType")[0]);
     const brand = normalize(getParamValues(querySearchParams, "brand")[0]);
@@ -496,7 +502,7 @@ export default function VehicleCardListing({
     const maxMileage = Number(getParamValues(querySearchParams, "maxMileage")[0] ?? "");
     const priceRange = parseRange(getParamValues(querySearchParams, "priceRange")[0]);
 
-    return list.filter((item) => {
+    return baseList.filter((item) => {
       const inv = item.inventory as InventoryMaybeExtended;
       const inventoryData = (item as any)?.inventoryData ?? inv.inventoryData;
 
@@ -540,12 +546,15 @@ export default function VehicleCardListing({
 
       return true;
     });
-  }, [vehicles, querySearchParams, hasFilters]);
+  }, [vehicles, querySearchParams, hasFilters, sellerId]);
 
   const displayBucketMeta = useMemo(() => {
-    if (!hasFilters) return bucketMeta as BucketMeta[];
+    if (!hasFilters) {
+      if (!sellerId) return bucketMeta as BucketMeta[];
+      return (bucketMeta as BucketMeta[]).filter((b) => String(b.sellerId ?? "") === String(sellerId));
+    }
     return toBucketMeta(filteredVehicles as unknown as any[], 30);
-  }, [bucketMeta, filteredVehicles, hasFilters]);
+  }, [bucketMeta, filteredVehicles, hasFilters, sellerId]);
 
   const vehiclePool = hasFilters ? filteredVehicles : (vehicles as Content[]);
   const [sortBy, setSortBy] = useState("sortBy=price&sortOrder=asc");

@@ -55,6 +55,9 @@ export default async function page({ params }: { params: Promise<{ slug: string 
                     initialData={vehicles.data.content}
                     currentPage={vehicles.data.currentPage}
                     totalItems={vehicles.data.totalElements}
+                    totalPages={vehicles.data.totalPages}
+                    pageSize={vehicles.data.size}
+                    last={vehicles.data.last}
                 />
             ),
         },
