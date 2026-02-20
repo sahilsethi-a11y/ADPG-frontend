@@ -9,10 +9,10 @@ import VehicleViewTracker from "@/components/vehicle-details/VehicleViewTracker"
 import VehicleDetails, { type VehicleDetailsData } from "@/components/vehicle-details/VehicleDetails";
 import { api } from "@/lib/api/server-request";
 import type { Specification } from "@/components/vehicle-details/VehicleSpecs";
-import AddToCartButton from "@/components/buyer/AddToCardButton";
 import PriceBadge from "@/elements/PriceBadge";
 import Button from "@/elements/Button";
 import { formatPrice } from "@/lib/utils";
+import { getCurrency } from "@/lib/serverActions";
 
 type Data = {
     id: string;
@@ -35,40 +35,14 @@ type Data = {
 
 export default async function page({
     params,
-    searchParams,
 }: {
     params: Promise<{ vehicleSlug: string }>;
-    searchParams?: Promise<{ sellerId?: string }>;
 }) {
     const { vehicleSlug } = await params;
-    const resolvedSearchParams = await searchParams;
-    const sellerIdFromQuery =
-        typeof resolvedSearchParams?.sellerId === "string" ? decodeURIComponent(resolvedSearchParams.sellerId) : undefined;
 
     const res = await api.get<{ data: Data }>("/inventory/api/v1/inventory/getInventoryDetails", { params: { id: vehicleSlug } });
     const data = res.data;
-    const mileage = data.vehicleDetails?.[0]?.mileage ?? "";
-    const storageItem = {
-        id: data.id,
-        name: data.name,
-        year: 0,
-        location: data.sellerInformation?.address || "",
-        quantity: 1,
-        price: Number(data.price) || 0,
-        currency: data.currency || "USD",
-        mainImageUrl: data.imageUrls?.[0] || "",
-        sellerCompany: data.sellerInformation?.name || "Unknown Seller",
-        sellerId: data.sellerInformation?.id || sellerIdFromQuery,
-        bucketKey: [data.name, data.price, data.currency].join("|"),
-        isSelected: true,
-        mileage,
-        brand: (data as any)?.inventory?.brand ?? (data as any)?.brand,
-        model: (data as any)?.inventory?.model ?? (data as any)?.model,
-        variant: (data as any)?.inventory?.variant ?? (data as any)?.variant,
-        color: (data as any)?.inventory?.color ?? (data as any)?.color,
-        condition: (data as any)?.inventory?.condition ?? (data as any)?.condition,
-        bodyType: (data as any)?.inventory?.bodyType ?? (data as any)?.bodyType,
-    };
+    const selectedCurrency = await getCurrency();
 
     const vin =
         (data as any)?.vehicleDetails?.[0]?.vin ??
@@ -129,7 +103,7 @@ export default async function page({
                                 <div className="bg-white rounded-xl border border-stroke-light p-7.5">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="text-right flex gap-1 items-center">
-                                            <div className="text-[30px] font-bold text-brand-blue">{formatPrice(data.price, data.currency)}</div>
+                                            <div className="text-[30px] font-bold text-brand-blue">{formatPrice(data.price, data.currency, selectedCurrency)}</div>
                                             <PriceBadge />
                                         </div>
                                     </div>

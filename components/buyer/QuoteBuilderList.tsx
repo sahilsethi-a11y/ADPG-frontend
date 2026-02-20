@@ -74,6 +74,17 @@ const getSellerIdByCompany = (sellerCompany?: string) => {
     }
 };
 
+const getSellerIdByVehicle = (vehicleId?: string) => {
+    if (!vehicleId || typeof window === "undefined") return undefined;
+    try {
+        const rawMap = window.localStorage.getItem(quoteSellerStorageKey);
+        const parsedMap = rawMap ? (JSON.parse(rawMap) as Record<string, string>) : {};
+        return parsedMap[vehicleId];
+    } catch {
+        return undefined;
+    }
+};
+
 const getVehicleIdByCompany = (sellerCompany?: string) => {
     if (!sellerCompany || typeof window === "undefined") return undefined;
     try {
@@ -92,7 +103,7 @@ const groupBySellerAndBucket = (list: QuoteItem[]): SellerGroup[] => {
 
     for (const item of list) {
         const seller = item.sellerCompany || "Unknown Seller";
-        const sellerId = item.sellerId;
+        const sellerId = item.sellerId || getSellerIdByVehicle(item.id) || getSellerIdByCompany(seller);
         const vehicleId = item.id;
         const bucketKey = buildBucketKey(item);
 
@@ -132,7 +143,10 @@ const groupBySellerAndBucket = (list: QuoteItem[]): SellerGroup[] => {
         return {
             sellerCompany,
             sellerId: sellerIds.get(sellerCompany) || getSellerIdByCompany(sellerCompany),
-            representativeVehicleId: sellerVehicleIds.get(sellerCompany) || getVehicleIdByCompany(sellerCompany),
+            representativeVehicleId:
+                sellerVehicleIds.get(sellerCompany) ||
+                getVehicleIdByCompany(sellerCompany) ||
+                buckets[0]?.items?.[0]?.id,
             buckets,
             totalItems,
             totalUnits,
@@ -243,8 +257,8 @@ export default function QuoteBuilderList({ list = [] }: Readonly<{ list: QuoteIt
                                     </span>
                                     <span className="font-medium">{bucket.totalUnits} units</span>
                                 </div>
-                                {bucket.items.map((item) => (
-                                    <QuoteCard key={item.id} item={item} onRemove={handleRemoveItem} />
+                                {bucket.items.map((item, itemIndex) => (
+                                    <QuoteCard key={`${bucket.key}:${item.id}:${itemIndex}`} item={item} onRemove={handleRemoveItem} />
                                 ))}
                             </div>
                         ))}

@@ -1,4 +1,7 @@
+"use client";
+
 import { Shield } from "@/components/Icons";
+import { formatPrice } from "@/lib/utils";
 
 export type VehicleInsurance = {
     name: string;
@@ -54,7 +57,7 @@ export default function InspectionPackages({
                                         </ul>
                                     </div>
                                     <div className="text-lg text-brand-blue">
-                                        {item.currency} {item.price}
+                                        {formatPrice(item.price, item.currency)}
                                     </div>
                                 </div>
                             </label>

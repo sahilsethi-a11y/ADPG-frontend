@@ -3,6 +3,8 @@ import ShortList from "@/components/vehicle-details/ShortList";
 import { api } from "@/lib/api/server-request";
 import Link from "next/link";
 import Image from "@/elements/Image";
+import { formatPrice } from "@/lib/utils";
+import { getCurrency } from "@/lib/serverActions";
 
 type Data = {
     data: {
@@ -26,6 +28,7 @@ type Data = {
 };
 
 export default async function Shortlisted() {
+    const selectedCurrency = await getCurrency();
     const res = await api.get<Data>(
         "/inventory/api/v1/inventory/getFavouriteListForUser",
         { params: { size: 100 } }
@@ -85,8 +88,7 @@ export default async function Shortlisted() {
                                         {item?.inventory?.model}
                                     </h4>
                                     <p className="text-lg text-brand-blue font-semibold mb-1">
-                                        {item?.inventory?.currency}{" "}
-                                        {item.inventory.price}
+                                        {formatPrice(item.inventory.price, item?.inventory?.currency, selectedCurrency)}
                                     </p>
                                     <p className="text-sm text-gray-600">
                                         {[

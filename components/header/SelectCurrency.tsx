@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDownIcon } from "@/components/Icons";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { usePathname } from "next/navigation";
@@ -10,6 +10,13 @@ type Currency = {
     value: string;
     symbol: string;
 };
+
+const SUPPORTED_CURRENCIES: Currency[] = [
+    { label: "US Dollar", value: "USD", symbol: "$" },
+    { label: "UAE Dirham", value: "AED", symbol: "د.إ" },
+    { label: "Chinese Yuan", value: "CNY", symbol: "¥" },
+    { label: "Euro", value: "EUR", symbol: "€" },
+];
 
 const PATH_WITHOUT_CURRENCY = [
     "/about-us",
@@ -26,7 +33,16 @@ const PATH_WITHOUT_CURRENCY = [
 ];
 
 export default function CurrencySelector({ filters, selectedCurrency }: Readonly<{ filters: Record<string, unknown>; selectedCurrency: string }>) {
-    const currencies = (filters?.currency ?? []) as Currency[];
+    const currencies = (() => {
+        const fromFilters = (filters?.currency ?? []) as Currency[];
+        const byCode = new Map<string, Currency>();
+        for (const c of SUPPORTED_CURRENCIES) byCode.set(c.value, c);
+        for (const c of fromFilters) {
+            if (!c?.value) continue;
+            byCode.set(c.value.toUpperCase(), { ...c, value: c.value.toUpperCase() });
+        }
+        return Array.from(byCode.values());
+    })();
 
     const pathname = usePathname();
     const isNotShowCurrencySelection = PATH_WITHOUT_CURRENCY.some((p) => pathname.startsWith(p));
@@ -40,8 +56,23 @@ const SelectCurrency = ({ currencies, selectedCurrency }: { currencies: Currency
 
     useOutsideClick(ref, () => setOpen(false));
 
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            window.localStorage.setItem("selectedCurrency", selectedCurrency);
+        } catch {}
+    }, [selectedCurrency]);
+
     const select = async (opt: Currency) => {
         await api.get("/api/v1/auth/setCurrency", { params: { value: opt.value } });
+        await fetch("/api/currency", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: opt.value }),
+        });
+        try {
+            window.localStorage.setItem("selectedCurrency", opt.value);
+        } catch {}
         globalThis.window.location.reload();
         setOpen(false);
     };

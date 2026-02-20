@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Button from "@/elements/Button";
 import { api } from "@/lib/api/client-request";
 import message from "@/elements/message";
-import { usePathname, useRouter } from "next/navigation";
 import { useVehicle } from "@/hooks/useVehicle";
 
 type PropsT = {
@@ -83,41 +82,17 @@ export default function AddToCartButton({
     sellerCompany,
     storageItem,
 }: Readonly<PropsT>) {
-    const pathname = usePathname();
-    const router = useRouter();
     const { totalItems } = useVehicle();
     const quantity = typeof quantityOverride === "number" ? quantityOverride : totalItems;
 
     const [loading, setLoading] = useState(false);
     const [disabled, setDisabled] = useState(false);
-    const [isBuyer, setIsBuyer] = useState<boolean | null>(null);
     const [localInQuote, setLocalInQuote] = useState(false);
     const quoteStorageKey = "quoteBuilderIds";
     const quoteSellerStorageKey = "quoteBuilderSellerByVehicle";
     const quoteSellerCompanyStorageKey = "quoteBuilderSellerByCompany";
     const quoteVehicleCompanyStorageKey = "quoteBuilderVehicleByCompany";
     const quoteItemsStorageKey = "quoteBuilderItems";
-
-    useEffect(() => {
-        let isActive = true;
-        const fetchRole = async () => {
-            try {
-                const userData = await api.get<{ data?: { roleType?: string } }>("/api/v1/auth/getUserInfoByToken", {
-                    isAuthRequired: false,
-                });
-                const role = userData.data?.roleType?.toLowerCase();
-                if (!isActive) return;
-                setIsBuyer(role === "buyer");
-            } catch {
-                if (!isActive) return;
-                setIsBuyer(false);
-            }
-        };
-        fetchRole();
-        return () => {
-            isActive = false;
-        };
-    }, []);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -248,8 +223,6 @@ export default function AddToCartButton({
         }
     };
 
-    if (isBuyer === false) return null;
-    if (isBuyer === null) return null;
     const inQuote = isInQuoteBuilder || localInQuote;
 
     const handleClick = () => {

@@ -287,11 +287,11 @@ export default function NegotiationQuotePanelLocal({
                 />
                 <div className="flex items-center justify-between mt-3 text-sm text-gray-600">
                     <span>Downpayment Amount:</span>
-                    <span className="font-semibold text-gray-900">${Math.round(downpaymentAmount).toLocaleString()}</span>
+                    <span className="font-semibold text-gray-900">{formatPrice(downpaymentAmount, currency)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>Remaining Balance:</span>
-                    <span className="font-semibold text-gray-900">${Math.round(remainingBalance).toLocaleString()}</span>
+                    <span className="font-semibold text-gray-900">{formatPrice(remainingBalance, currency)}</span>
                 </div>
             </div>
 

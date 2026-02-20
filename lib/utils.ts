@@ -9,9 +9,78 @@ const currencyLocaleMap: Record<string, string> = {
     AED: "ar-AE", // UAE Dirham
 };
 
+const usdPerCurrency: Record<string, number> = {
+    USD: 1,
+    AED: 0.272294,
+    CNY: 0.139,
+    EUR: 1.08,
+};
+
+const getCurrencyFromCookie = (cookieText?: string) => {
+    if (!cookieText) return undefined;
+    const match = cookieText.match(/(?:^|;\s*)currencyCookie=([^;]+)/);
+    if (!match?.[1]) return undefined;
+    return decodeURIComponent(match[1]);
+};
+
+export const normalizeCurrency = (currency?: string, fallback = "USD") => {
+    const safeCurrency =
+        typeof currency === "string" && currency.trim().length === 3 ? currency.trim().toUpperCase() : fallback;
+    return usdPerCurrency[safeCurrency] ? safeCurrency : fallback;
+};
+
+export const convertCurrency = (amount: number | string, fromCurrency: string, toCurrency: string) => {
+    const from = normalizeCurrency(fromCurrency);
+    const to = normalizeCurrency(toCurrency);
+    const numericAmount = Number(amount) || 0;
+    if (from === to) return numericAmount;
+    const amountInUsd = numericAmount * usdPerCurrency[from];
+    return amountInUsd / usdPerCurrency[to];
+};
+
+const resolvePreferredCurrency = () => {
+    if (typeof window === "undefined") return undefined;
+    try {
+        const fromLocal = window.localStorage.getItem("selectedCurrency");
+        if (fromLocal) {
+            const normalized = normalizeCurrency(fromLocal);
+            if (usdPerCurrency[normalized]) return normalized;
+        }
+    } catch {}
+    const fromCookie = getCurrencyFromCookie(document.cookie);
+    if (fromCookie) {
+        const normalized = normalizeCurrency(fromCookie);
+        if (usdPerCurrency[normalized]) return normalized;
+    }
+    return undefined;
+};
+
+export const formatConvertedPrice = (
+    amount: number | string,
+    fromCurrency: string = "USD",
+    toCurrency: string = fromCurrency,
+    options?: Intl.NumberFormatOptions
+) => {
+    const normalizedToCurrency = normalizeCurrency(toCurrency, normalizeCurrency(fromCurrency));
+    const converted = convertCurrency(amount, fromCurrency, normalizedToCurrency);
+    try {
+        return new Intl.NumberFormat(currencyLocaleMap[normalizedToCurrency] || "en-US", {
+            style: "currency",
+            currency: normalizedToCurrency,
+            ...options,
+        }).format(converted);
+    } catch {
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+            ...options,
+        }).format(converted);
+    }
+};
+
 export const queryStringify = (params: Record<string, string | string[]>): string => {
     const query = Object.entries(params)
-        .filter(([_, value]) => value !== "" || value.length !== 0)
+        .filter(([, value]) => value !== "" || value.length !== 0)
         .map(([key, value]) => {
             if (Array.isArray(value)) {
                 return value.map((val) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
@@ -83,18 +152,5 @@ export const getDaysBetween = (date1: string | Date, date2: string | Date): numb
     return Math.round(diffMs / (1000 * 60 * 60 * 24));
 };
 
-export const formatPrice = (price: number | string, currency: string = "USD") => {
-    const safeCurrency =
-        typeof currency === "string" && currency.trim().length === 3 ? currency.trim().toUpperCase() : "USD";
-    try {
-        return new Intl.NumberFormat(currencyLocaleMap[safeCurrency] || "en-US", {
-            style: "currency",
-            currency: safeCurrency,
-        }).format(+price);
-    } catch {
-        return new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-        }).format(+price);
-    }
-};
+export const formatPrice = (price: number | string, sourceCurrency: string = "USD", targetCurrency?: string) =>
+    formatConvertedPrice(price, sourceCurrency, targetCurrency ?? resolvePreferredCurrency() ?? sourceCurrency);

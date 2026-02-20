@@ -6,6 +6,7 @@ import { api } from "@/lib/api/client-request";
 import { BanIcon, CautionIcon, CloseIcon, UploadIcon } from "@/components/Icons";
 import message from "@/elements/message";
 import { uploadFile } from "@/lib/data";
+import { formatPrice } from "@/lib/utils";
 import type { Content } from "./ListingModerationTab";
 import Input from "@/elements/Input";
 
@@ -108,7 +109,7 @@ export default function SuspendListing({ handleClose, item }: Readonly<PropsT>) 
                         <div>
                             <span className="text-gray-600">Price:</span>
                             <span className="ml-2">
-                                {item?.inventory?.currency} {item?.inventory?.price}
+                                {formatPrice(item?.inventory?.price ?? 0, item?.inventory?.currency ?? "USD")}
                             </span>
                         </div>
                         <div>

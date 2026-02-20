@@ -6,7 +6,7 @@ import QRShare from "@/components/vehicle-details/QRShare";
 import Link from "next/link";
 import ShortList from "@/components/vehicle-details/ShortList";
 import Image from "@/elements/Image";
-import { formatPrice } from "@/lib/utils";
+import { formatConvertedPrice } from "@/lib/utils";
 import PriceBadge from "@/elements/PriceBadge";
 import type { Content } from "@/app/vehicles/page";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,7 @@ type Props = Readonly<{
     showQuoteButton?: boolean;
     isInQuoteBuilder?: boolean;
     onAddToQuote?: () => void;
+    selectedCurrency?: string;
 }>;
 
 export default function VehicleCard({
@@ -42,6 +43,7 @@ export default function VehicleCard({
     showQuoteButton,
     isInQuoteBuilder,
     onAddToQuote,
+    selectedCurrency,
 }: Props) {
     const router = useRouter();
     const [imageLoaded, setImageLoaded] = useState(false);
@@ -52,14 +54,6 @@ export default function VehicleCard({
         }
         router.push(`/vehicles/${item.inventory.id}`);
     };
-    const formatPriceNoDecimals = (value: number | string, currency = "USD") =>
-        new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency,
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(Number(value) || 0);
-
     /**
      * ✅ Always show units badge if bucketCount was passed, including 1
      */
@@ -88,19 +82,28 @@ export default function VehicleCard({
     const priceText = (() => {
         if (!bucketPriceRange) {
             const price = Math.round(Number(item.inventory?.price) || 0);
-            return formatPriceNoDecimals(price, item.inventory?.currency);
+            return formatConvertedPrice(price, item.inventory?.currency, selectedCurrency, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            });
         }
 
         const currency = bucketPriceRange.currency ?? item.inventory?.currency;
 
         if (bucketPriceRange.min === bucketPriceRange.max) {
-            return formatPriceNoDecimals(Math.round(bucketPriceRange.min), currency);
+            return formatConvertedPrice(Math.round(bucketPriceRange.min), currency, selectedCurrency, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            });
         }
 
-        return `${formatPriceNoDecimals(Math.round(bucketPriceRange.min), currency)} - ${formatPriceNoDecimals(
-            Math.round(bucketPriceRange.max),
-            currency
-        )}`;
+        return `${formatConvertedPrice(Math.round(bucketPriceRange.min), currency, selectedCurrency, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        })} - ${formatConvertedPrice(Math.round(bucketPriceRange.max), currency, selectedCurrency, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        })}`;
     })();
 
     return (

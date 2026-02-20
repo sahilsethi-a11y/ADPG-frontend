@@ -1,4 +1,7 @@
+"use client";
+
 import { CheckCircleIcon, CreditCardIcon } from "@/components/Icons";
+import { formatPrice } from "@/lib/utils";
 
 export type paymentOption = {
     currency: string;
@@ -87,7 +90,7 @@ const PaymentOptionCard = ({
             <div className="flex items-center gap-2">
                 <h5 className="text-brand-blue">{title}</h5>
                 <span className="text-brand-blue">
-                    {paymentData.currency} {paymentData.price}
+                    {formatPrice(paymentData.price, paymentData.currency)}
                 </span>
             </div>
             <p className="text-sm text-gray-600">{paymentData.text}</p>

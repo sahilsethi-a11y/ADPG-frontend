@@ -1,6 +1,7 @@
 import FilterBar from "@/components/FilterBar";
 import VehicleCardListing from "@/components/inventory-listing/VehicleCardListing";
 import { getBrands, getFilters } from "@/lib/data";
+import { getCurrency } from "@/lib/serverActions";
 
 export type Content = {
     id: string;
@@ -69,6 +70,7 @@ export default async function VehicleListing({ searchParams }: Readonly<PageProp
 
     const brandRes = getBrands();
     const filterRes = getFilters();
+    const selectedCurrency = await getCurrency();
 
     return (
         <main className="text-[#4a5565] container mx-auto px-4 lg:px-6 py-8">
@@ -91,6 +93,7 @@ export default async function VehicleListing({ searchParams }: Readonly<PageProp
                 totalPages={data.totalPages}
                 pageSize={data.size}
                 cartInventoryIds={cartInventoryIds}
+                selectedCurrency={selectedCurrency}
             />
         </main>
     );

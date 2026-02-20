@@ -21,6 +21,7 @@ import message from "@/elements/message";
 import { useVehicleBuckets } from "@/hooks/useVehicleBuckets";
 import type { BucketMeta } from "@/lib/bucketCache";
 import { toBucketMeta } from "@/lib/bucketing";
+import { formatConvertedPrice } from "@/lib/utils";
 
 type PropsT = {
   initialData: Content[];
@@ -32,6 +33,7 @@ type PropsT = {
   pageSize: number;
   cartInventoryIds?: string[];
   sellerId?: string;
+  selectedCurrency?: string;
 };
 
 type InventoryMaybeExtended = Content["inventory"] & {
@@ -141,14 +143,6 @@ const getVin = (inv: InventoryMaybeExtended, inventoryData?: { vin?: string }) =
 };
 
 const normalizeId = (id: string | number | undefined | null) => String(id ?? "");
-
-const formatPriceNoDecimals = (value: number | string, currency = "USD") =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
 
 const buildBucketKey = (inv: InventoryMaybeExtended) => {
   const brand = safeStr(inv.brand).toLowerCase();
@@ -271,6 +265,7 @@ function UnitCardRow({
   canUseQuoteBuilder,
   onAddToQuote,
   onRemoveFromQuote,
+  selectedCurrency,
 }: {
   item: Content;
   isInQuoteBuilder: boolean;
@@ -300,6 +295,7 @@ function UnitCardRow({
     };
   }) => void;
   onRemoveFromQuote: (id: string) => void;
+  selectedCurrency?: string;
 }) {
   const router = useRouter();
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -314,7 +310,10 @@ function UnitCardRow({
       : (inv as any)?.inspectionReportUrl ??
         (inv as any)?.inventoryData?.inspectionReportUrl ??
         (item as any)?.inventoryData?.inspectionReportUrl;
-  const price = formatPriceNoDecimals(inv.price, inv.currency);
+  const price = formatConvertedPrice(inv.price, inv.currency, selectedCurrency, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
   const sellerId = item?.inventory?.userId || (item as any)?.user?.userId;
   const sellerCompany =
     item?.user?.roleMetaData?.companyName || item?.user?.roleMetaData?.dealershipName;
@@ -452,6 +451,7 @@ export default function VehicleCardListing({
   totalPages,
   pageSize,
   sellerId,
+  selectedCurrency,
 }: Readonly<PropsT>) {
   const { vehicles, buckets: bucketMeta } = useVehicleBuckets(querySearchParams, {
     refreshOnMount: false,
@@ -556,7 +556,7 @@ export default function VehicleCardListing({
     return toBucketMeta(filteredVehicles as unknown as any[], 30);
   }, [bucketMeta, filteredVehicles, hasFilters, sellerId]);
 
-  const vehiclePool = hasFilters ? filteredVehicles : (vehicles as Content[]);
+  const vehiclePool = filteredVehicles;
   const [sortBy, setSortBy] = useState("sortBy=price&sortOrder=asc");
   const sortByRef = useRef("sortBy=price&sortOrder=asc");
   const [bucketPage, setBucketPage] = useState(1);
@@ -799,7 +799,7 @@ export default function VehicleCardListing({
   }, [displayBucketMeta, vehicleMap, vehiclePool]);
 
   const groupsCount = buckets.length;
-  const totalCount = vehiclePool.length || totalItems;
+  const totalCount = vehiclePool.length;
   const sortedBuckets = useMemo(() => {
     const list = [...buckets];
     const parts = sortBy.split("&");
@@ -902,8 +902,19 @@ export default function VehicleCardListing({
   const priceRangeText = (b?: Bucket) => {
     if (!b) return "";
     const currency = b.currency ?? b.representative.inventory.currency;
-    if (b.minPrice === b.maxPrice) return formatPriceNoDecimals(Math.round(b.minPrice), currency);
-    return `${formatPriceNoDecimals(Math.round(b.minPrice), currency)} - ${formatPriceNoDecimals(Math.round(b.maxPrice), currency)}`;
+    if (b.minPrice === b.maxPrice) {
+      return formatConvertedPrice(Math.round(b.minPrice), currency, selectedCurrency, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+    }
+    return `${formatConvertedPrice(Math.round(b.minPrice), currency, selectedCurrency, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })} - ${formatConvertedPrice(Math.round(b.maxPrice), currency, selectedCurrency, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })}`;
   };
   const mileageRangeText = (b?: Bucket) => {
     if (!b || b.minMileage === undefined || b.maxMileage === undefined) return "";
@@ -972,6 +983,7 @@ export default function VehicleCardListing({
               }}
               viewAllLabel={bucket.count > 1 ? `View all ${bucket.count} units` : "View details"}
               onViewAllClick={() => setOpenBucketKey(bucket.key)}
+              selectedCurrency={selectedCurrency}
             />
           );
         })}
@@ -1188,6 +1200,7 @@ export default function VehicleCardListing({
                     addQuoteLocal(payload);
                   }}
                   onRemoveFromQuote={removeQuoteLocal}
+                  selectedCurrency={selectedCurrency}
                 />
               ))}
             </div>

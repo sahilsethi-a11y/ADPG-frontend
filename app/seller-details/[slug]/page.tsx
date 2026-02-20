@@ -7,6 +7,7 @@ import About, { type AboutData } from "@/components/single-seller/About";
 import { api } from "@/lib/api/server-request";
 import { Data as VehicleData } from "@/app/vehicles/page";
 import { getBrands, getFilters } from "@/lib/data";
+import { getCurrency } from "@/lib/serverActions";
 
 type Data = {
     userInformation: {
@@ -41,6 +42,7 @@ export default async function page({ params }: { params: Promise<{ slug: string 
 
     const [userInfo, vehicles] = await Promise.all([res, vehicleData]);
     const data = userInfo.data;
+    const selectedCurrency = await getCurrency();
     const brandRes = getBrands();
     const filterRes = getFilters();
 
@@ -58,6 +60,7 @@ export default async function page({ params }: { params: Promise<{ slug: string 
                     totalPages={vehicles.data.totalPages}
                     pageSize={vehicles.data.size}
                     last={vehicles.data.last}
+                    selectedCurrency={selectedCurrency}
                 />
             ),
         },

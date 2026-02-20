@@ -12,11 +12,12 @@ type PropsT = {
     pageSize: number;
     last: boolean;
     userId: string;
+    selectedCurrency?: string;
     brandRes?: Promise<unknown>;
     filterRes?: Promise<unknown>;
 };
 
-export default function VehicleList({ initialData, currentPage, totalItems, totalPages, pageSize, last, userId }: Readonly<PropsT>) {
+export default function VehicleList({ initialData, currentPage, totalItems, totalPages, pageSize, last, userId, selectedCurrency }: Readonly<PropsT>) {
     const sellerListingParams: SearchParams = {
         sortBy: "price",
         sortOrder: "asc",
@@ -32,6 +33,7 @@ export default function VehicleList({ initialData, currentPage, totalItems, tota
             totalPages={totalPages}
             pageSize={pageSize}
             sellerId={userId}
+            selectedCurrency={selectedCurrency}
         />
     );
 }
