@@ -96,6 +96,8 @@ export default function NegotiationClientWrapper({
     const [logisticsPartner, setLogisticsPartner] = useState<"UGR" | "None">("UGR");
     const [destinationPort, setDestinationPort] = useState<"Jabel Ali" | "Khalifa Port">("Jabel Ali");
     const [vehicleMeta, setVehicleMeta] = useState<{ name: string; image?: string; year?: number } | null>(null);
+    const [hasLoadedInitialProposalState, setHasLoadedInitialProposalState] = useState(false);
+    const [hasMinLoaderDelay, setHasMinLoaderDelay] = useState(false);
 
     // ==========================================
     // Submit Proposal Handler
@@ -107,6 +109,14 @@ export default function NegotiationClientWrapper({
     const isBuyer = normalizedRole === "buyer";
     const isSeller = normalizedRole === "seller" || normalizedRole === "dealer";
     const canEditDiscounts = isBuyer || isCountering;
+    const showInitialLoader = !hasLoadedInitialProposalState || !hasMinLoaderDelay;
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setHasMinLoaderDelay(true);
+        }, 2000);
+        return () => window.clearTimeout(timer);
+    }, []);
 
     const setStateFromProposal = useCallback((proposal: ActiveProposal) => {
         const nextDiscounts: Record<string, number> = {};
@@ -135,6 +145,37 @@ export default function NegotiationClientWrapper({
             } catch (err) {
                 return { ok: false as const, error: (err as Error).message || "Network error" };
             }
+        },
+        [conversationId]
+    );
+
+    const verifyProposalPersisted = useCallback(
+        async (expectedStatus: ActiveProposal["status"]) => {
+            const maxAttempts = 6;
+            for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                try {
+                    const res = await fetch(
+                        `/api/negotiation-proposals?conversationId=${encodeURIComponent(conversationId)}`,
+                        { cache: "no-store" }
+                    );
+                    if (res.ok) {
+                        const data = await res.json();
+                        const persisted = data?.proposal as ActiveProposal | null | undefined;
+                        const negotiationStatus = typeof data?.negotiationStatus === "string" ? data.negotiationStatus : "";
+                        if (
+                            persisted?.status === expectedStatus &&
+                            negotiationStatus === expectedStatus &&
+                            negotiationStatus.toLowerCase() !== "ongoing" &&
+                            Array.isArray(persisted?.bucketSummaries) &&
+                            persisted.bucketSummaries.length > 0
+                        ) {
+                            return { ok: true as const, proposal: persisted };
+                        }
+                    }
+                } catch {}
+                await new Promise((resolve) => window.setTimeout(resolve, 300));
+            }
+            return { ok: false as const };
         },
         [conversationId]
     );
@@ -191,21 +232,6 @@ export default function NegotiationClientWrapper({
                     status,
                 };
 
-                fetch("/api/negotiation-index", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        item: {
-                            conversationId,
-                            buyerId: isBuyer ? userId : sellerId,
-                            sellerId: isBuyer ? sellerId : userId,
-                            itemId: vehicleId,
-                            roleType: isBuyer ? "buyer" : "seller",
-                            status: "ongoing",
-                        },
-                    }),
-                }).catch(() => {});
-
                 const result = await saveProposal(proposal);
                 if (!result.ok) {
                     console.error("Failed to submit negotiation proposal", {
@@ -221,8 +247,22 @@ export default function NegotiationClientWrapper({
                     return;
                 }
 
+                const persisted = await verifyProposalPersisted(status);
+                if (!persisted.ok) {
+                    console.error("Proposal persistence verification failed", {
+                        conversationId,
+                        expectedStatus: status,
+                    });
+                    message.error("Proposal not persisted yet. Please submit again.");
+                    setSubmissionError("Proposal was not saved correctly. Please try submitting again.");
+                    setUiStatus("IDLE");
+                    setActiveProposal(null);
+                    setIsSubmitting(false);
+                    return;
+                }
+
                 setUiStatus("BUYER_PROPOSED");
-                setActiveProposal(proposal);
+                setActiveProposal(persisted.proposal);
                 setIsCountering(false);
 
                 window.dispatchEvent(
@@ -246,11 +286,12 @@ export default function NegotiationClientWrapper({
                 setIsSubmitting(false);
             }
         },
-        [activeProposal, isBuyer, saveProposal, selectedPort, effectiveRole, sellerId, userId, vehicleId]
+        [activeProposal, conversationId, isBuyer, saveProposal, selectedPort, verifyProposalPersisted]
     );
 
     useEffect(() => {
         let isActive = true;
+        let hasMarkedInitialLoad = false;
         const loadProposal = async () => {
             try {
                 const res = await fetch(
@@ -260,15 +301,32 @@ export default function NegotiationClientWrapper({
                 if (!res.ok) return;
                 const data = await res.json();
                 if (!isActive) return;
-                if (data?.proposal) {
-                    setActiveProposal(data.proposal as ActiveProposal);
+                const loadedProposal = data?.proposal as ActiveProposal | null | undefined;
+                const negotiationStatus = typeof data?.negotiationStatus === "string" ? data.negotiationStatus : "";
+                const proposalStatus = loadedProposal?.status || "";
+                const isSyncedStatus =
+                    !!loadedProposal &&
+                    proposalStatus.length > 0 &&
+                    negotiationStatus.length > 0 &&
+                    proposalStatus === negotiationStatus &&
+                    negotiationStatus.toLowerCase() !== "ongoing";
+                if (isSyncedStatus && loadedProposal) {
+                    setActiveProposal(loadedProposal);
                     setUiStatus("BUYER_PROPOSED");
                     // Avoid overwriting local edits while countering
                     if (!isCountering) {
-                        setStateFromProposal(data.proposal as ActiveProposal);
+                        setStateFromProposal(loadedProposal);
                     }
+                } else if (!isCountering) {
+                    setActiveProposal(null);
                 }
             } catch {}
+            finally {
+                if (isActive && !hasMarkedInitialLoad) {
+                    hasMarkedInitialLoad = true;
+                    setHasLoadedInitialProposalState(true);
+                }
+            }
         };
         loadProposal();
         const interval = window.setInterval(loadProposal, 5000);
@@ -401,13 +459,20 @@ export default function NegotiationClientWrapper({
             status: "seller_accepted",
             submittedAt: new Date().toISOString(),
         };
-        const ok = await saveProposal(next);
-        if (ok) {
-            setActiveProposal(next);
-            setUiStatus("BUYER_PROPOSED");
-            setIsCountering(false);
+        const result = await saveProposal(next);
+        if (!result.ok) {
+            message.error("Failed to update proposal status. Please try again.");
+            return;
         }
-    }, [activeProposal, saveProposal]);
+        const persisted = await verifyProposalPersisted("seller_accepted");
+        if (!persisted.ok) {
+            message.error("Status update not confirmed yet. Please try again.");
+            return;
+        }
+        setActiveProposal(persisted.proposal);
+        setUiStatus("BUYER_PROPOSED");
+        setIsCountering(false);
+    }, [activeProposal, saveProposal, verifyProposalPersisted]);
 
     const addNegotiationToCart = useCallback(async () => {
         if (!activeProposal || !vehicleId) return;
@@ -727,6 +792,15 @@ export default function NegotiationClientWrapper({
                     ) : null}
                 </div>
             </Modal>
+
+            {showInitialLoader ? (
+                <div className="fixed inset-0 z-30 flex items-center justify-center bg-white/70">
+                    <div className="flex items-center gap-3 rounded-lg border border-stroke-light bg-white px-4 py-3 shadow-sm text-sm text-gray-700">
+                        <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-brand-blue border-t-transparent" />
+                        Loading conversation...
+                    </div>
+                </div>
+            ) : null}
         </>
     );
 }

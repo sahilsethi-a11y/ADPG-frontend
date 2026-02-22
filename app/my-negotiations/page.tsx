@@ -2,8 +2,10 @@ import NegotiationList, { type Negotiation } from "@/components/negotiations/Neg
 import { api } from "@/lib/api/server-request";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { Suspense } from "react";
+import LoadingNegotiationsPage from "./loading";
 
-export default async function MyNegotiations() {
+async function MyNegotiationsContent() {
     const cookieStore = await cookies();
     const tokenValue = cookieStore.get("userToken")?.value || "";
     const userData = await api.get<{ data: { roleType: string; userId: string } }>("/api/v1/auth/getUserInfoByToken", {
@@ -34,5 +36,13 @@ export default async function MyNegotiations() {
                 </div>
             ) : null}
         </main>
+    );
+}
+
+export default function MyNegotiations() {
+    return (
+        <Suspense fallback={<LoadingNegotiationsPage />}>
+            <MyNegotiationsContent />
+        </Suspense>
     );
 }

@@ -6,6 +6,7 @@ const binId = process.env.JSONBIN_BIN_ID;
 
 type ProposalRecord = {
     proposalsByConversation?: Record<string, unknown>;
+    negotiationsByConversation?: Record<string, unknown>;
 };
 
 async function readBin(): Promise<ProposalRecord> {
@@ -79,8 +80,14 @@ export async function GET(request: Request) {
         const record = await readBin();
         const proposalsByConversation = record?.proposalsByConversation ?? {};
         const proposal = (proposalsByConversation as Record<string, unknown>)[conversationId] ?? null;
+        const negotiationsByConversation = record?.negotiationsByConversation ?? {};
+        const negotiationEntry = (negotiationsByConversation as Record<string, unknown>)[conversationId];
+        const negotiationStatus =
+            typeof negotiationEntry === "object" && negotiationEntry !== null && typeof (negotiationEntry as Record<string, unknown>).status === "string"
+                ? ((negotiationEntry as Record<string, unknown>).status as string)
+                : null;
 
-        return NextResponse.json({ proposal });
+        return NextResponse.json({ proposal, negotiationStatus });
     } catch (err) {
         console.error("Negotiation proposals GET error:", err);
         return NextResponse.json({ error: (err as Error).message }, { status: 500 });
@@ -91,7 +98,7 @@ export async function POST(request: Request) {
     try {
         const body = (await request.json()) as {
             conversationId?: string;
-            proposal?: Record<string, unknown>;
+            proposal?: Record<string, unknown> & { status?: string };
         };
 
         if (!body?.conversationId || !body?.proposal) {
@@ -104,12 +111,43 @@ export async function POST(request: Request) {
             [body.conversationId]: body.proposal,
         };
 
+        const existingNegotiationEntryRaw = (record?.negotiationsByConversation ?? {})[body.conversationId];
+        const existingNegotiationEntry =
+            typeof existingNegotiationEntryRaw === "object" && existingNegotiationEntryRaw !== null
+                ? (existingNegotiationEntryRaw as Record<string, unknown>)
+                : {};
+        const now = new Date().toISOString();
+        const proposalStatus = typeof body.proposal.status === "string" ? body.proposal.status : undefined;
+        const existingStatus = typeof existingNegotiationEntry["status"] === "string" ? existingNegotiationEntry["status"] : undefined;
+        const existingStartedAt = typeof existingNegotiationEntry["startedAt"] === "string" ? existingNegotiationEntry["startedAt"] : undefined;
+        const negotiationsByConversation = {
+            ...(record?.negotiationsByConversation ?? {}),
+            [body.conversationId]: {
+                ...existingNegotiationEntry,
+                conversationId: body.conversationId,
+                status: proposalStatus || existingStatus || "ongoing",
+                startedAt: existingStartedAt || now,
+                updatedAt: now,
+            },
+        };
+
+        const latestRecord = await readBin();
+        const latestProposals = latestRecord?.proposalsByConversation ?? {};
+        const latestNegotiations = latestRecord?.negotiationsByConversation ?? {};
+
         await writeBin({
-            ...record,
-            proposalsByConversation,
+            ...latestRecord,
+            proposalsByConversation: {
+                ...latestProposals,
+                ...proposalsByConversation,
+            },
+            negotiationsByConversation: {
+                ...latestNegotiations,
+                ...negotiationsByConversation,
+            },
         });
 
-        return NextResponse.json({ status: "OK" });
+        return NextResponse.json({ status: "OK", proposalStatus: proposalStatus || "ongoing" });
     } catch (err) {
         console.error("Negotiation proposals POST error:", err);
         return NextResponse.json({ error: (err as Error).message }, { status: 500 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircleIcon, CheckCircleIcon, ClockIcon, MessageSquareIcon, SearchIcon, UserIcon } from "@/components/Icons";
 import Input from "@/elements/Input";
 import Button from "@/elements/Button";
@@ -84,10 +84,30 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [hasLoadedPrimary, setHasLoadedPrimary] = useState(false);
     const [hasLoadedFallback, setHasLoadedFallback] = useState(false);
+    const [hasLoadedProposalStatuses, setHasLoadedProposalStatuses] = useState(false);
+    const [hasRenderedTopCardStatus, setHasRenderedTopCardStatus] = useState(false);
+    const [hasMinLoaderDelay, setHasMinLoaderDelay] = useState(false);
 
     const [query, setQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState(filters[0].value);
     const router = useRouter();
+
+    const mergedNegotiations = useMemo(() => {
+        return [
+            ...new Map(
+                [...extraNegotiations, ...(data?.content ?? [])].map((i) => [i.conversationId, i])
+            ).values(),
+        ].sort((a, b) => {
+            const at = new Date((a.startedAt || a.updatedAt) ?? 0).getTime();
+            const bt = new Date((b.startedAt || b.updatedAt) ?? 0).getTime();
+            return bt - at;
+        });
+    }, [extraNegotiations, data]);
+
+    useEffect(() => {
+        const t = window.setTimeout(() => setHasMinLoaderDelay(true), 2000);
+        return () => window.clearTimeout(t);
+    }, []);
 
     useEffect(() => {
         const items =
@@ -220,16 +240,34 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
     }, [data, roleType, userId]);
 
     useEffect(() => {
-        if (hasLoadedPrimary && hasLoadedFallback) setIsInitialLoading(false);
-    }, [hasLoadedPrimary, hasLoadedFallback]);
+        if (hasLoadedPrimary && hasLoadedFallback && hasLoadedProposalStatuses) {
+            const top = mergedNegotiations[0];
+            if (!top) {
+                setHasRenderedTopCardStatus(true);
+            } else {
+                const topStatus = proposalStatusMap[top.conversationId] || top.status;
+                setHasRenderedTopCardStatus(Boolean(topStatus));
+            }
+        }
+    }, [hasLoadedPrimary, hasLoadedFallback, hasLoadedProposalStatuses, mergedNegotiations, proposalStatusMap]);
 
     useEffect(() => {
-        const ids = [...new Set([...extraNegotiations, ...(data?.content ?? [])].map((i) => i.conversationId).filter(Boolean))];
+        if (hasLoadedPrimary && hasLoadedFallback && hasLoadedProposalStatuses && hasRenderedTopCardStatus && hasMinLoaderDelay) {
+            setIsInitialLoading(false);
+        }
+    }, [hasLoadedPrimary, hasLoadedFallback, hasLoadedProposalStatuses, hasRenderedTopCardStatus, hasMinLoaderDelay]);
+
+    useEffect(() => {
+        setHasLoadedProposalStatuses(false);
+        setHasRenderedTopCardStatus(false);
+        const ids = [...new Set(mergedNegotiations.map((i) => i.conversationId).filter(Boolean))];
         if (!ids.length) {
             setProposalStatusMap({});
             setProposalMap({});
+            setHasLoadedProposalStatuses(true);
             return;
         }
+        let isActive = true;
         const fetchStatuses = async () => {
             try {
                 const res = await fetch(`/api/negotiation-proposals?ids=${ids.join(",")}`, { cache: "no-store" });
@@ -241,12 +279,19 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                     const status = (value as any)?.status;
                     if (status) next[key] = String(status);
                 }
+                if (!isActive) return;
                 setProposalStatusMap(next);
                 setProposalMap(proposals);
             } catch {}
+            finally {
+                if (isActive) setHasLoadedProposalStatuses(true);
+            }
         };
         fetchStatuses();
-    }, [data, extraNegotiations]);
+        return () => {
+            isActive = false;
+        };
+    }, [mergedNegotiations]);
 
     const navigateToDetail = (i: Content) => {
         const url = "/vehicles/" + i.itemId;
@@ -273,17 +318,7 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                 </div>
             </div>
             <div className="flex flex-col gap-6">
-                {[
-                    ...new Map(
-                        [...extraNegotiations, ...(data?.content ?? [])].map((i) => [i.conversationId, i])
-                    ).values(),
-                ]
-                    .sort((a, b) => {
-                        const at = new Date((a.startedAt || a.updatedAt) ?? 0).getTime();
-                        const bt = new Date((b.startedAt || b.updatedAt) ?? 0).getTime();
-                        return bt - at;
-                    })
-                    .map((i) => {
+                {mergedNegotiations.map((i) => {
                         const altText = [i.vehicle.year, i.vehicle.brand, i.vehicle.model, i.vehicle.variant]
                             .filter(Boolean)
                             .join(" ")

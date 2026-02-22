@@ -82,9 +82,15 @@ export async function POST(request: Request) {
             };
         }
 
+        const latestRecord = await readBin();
+        const latestNegotiations = latestRecord?.negotiationsByConversation ?? {};
+
         await writeBin({
-            ...record,
-            negotiationsByConversation: next,
+            ...latestRecord,
+            negotiationsByConversation: {
+                ...latestNegotiations,
+                ...next,
+            },
         });
 
         return NextResponse.json({ status: "OK" });

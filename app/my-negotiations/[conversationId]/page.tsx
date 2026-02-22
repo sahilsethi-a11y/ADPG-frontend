@@ -4,6 +4,8 @@ import NegotiationClientWrapper from "@/components/negotiations/NegotiationClien
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { api } from "@/lib/api/server-request";
+import { Suspense } from "react";
+import LoadingConversation from "./loading";
 
 type Vehicle = {
     id: string;
@@ -29,7 +31,7 @@ type Data = {
     negotiationInfo: NegotiationInfo;
 };
 
-export default async function MyConversation({
+async function MyConversationContent({
     params,
     searchParams,
 }: {
@@ -84,5 +86,16 @@ export default async function MyConversation({
                 />
             </div>
         </main>
+    );
+}
+
+export default function MyConversation(props: {
+    params: Promise<{ conversationId: string }>;
+    searchParams?: Promise<{ seller?: string }>;
+}) {
+    return (
+        <Suspense fallback={<LoadingConversation />}>
+            <MyConversationContent {...props} />
+        </Suspense>
     );
 }
