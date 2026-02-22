@@ -9,6 +9,18 @@ type ProposalRecord = {
     negotiationsByConversation?: Record<string, unknown>;
 };
 
+const parseConversationId = (conversationId: string) => {
+    const parts = conversationId.split("_");
+    if (parts.length < 4) {
+        return { buyerId: "", sellerId: "", itemId: "" };
+    }
+    return {
+        buyerId: parts[0] || "",
+        sellerId: parts[1] || "",
+        itemId: parts[2] || "",
+    };
+};
+
 async function readBin(): Promise<ProposalRecord> {
     if (!masterKey || !binId) {
         throw new Error("Missing JSONBIN_MASTER_KEY or JSONBIN_BIN_ID");
@@ -116,15 +128,35 @@ export async function POST(request: Request) {
             typeof existingNegotiationEntryRaw === "object" && existingNegotiationEntryRaw !== null
                 ? (existingNegotiationEntryRaw as Record<string, unknown>)
                 : {};
+        const parsed = parseConversationId(body.conversationId);
         const now = new Date().toISOString();
         const proposalStatus = typeof body.proposal.status === "string" ? body.proposal.status : undefined;
         const existingStatus = typeof existingNegotiationEntry["status"] === "string" ? existingNegotiationEntry["status"] : undefined;
         const existingStartedAt = typeof existingNegotiationEntry["startedAt"] === "string" ? existingNegotiationEntry["startedAt"] : undefined;
+        const existingBuyerId = typeof existingNegotiationEntry["buyerId"] === "string" ? existingNegotiationEntry["buyerId"] : "";
+        const existingSellerId = typeof existingNegotiationEntry["sellerId"] === "string" ? existingNegotiationEntry["sellerId"] : "";
+        const existingItemId = typeof existingNegotiationEntry["itemId"] === "string" ? existingNegotiationEntry["itemId"] : "";
+        const buyerId = existingBuyerId || parsed.buyerId;
+        const sellerId = existingSellerId || parsed.sellerId;
+        const itemId = existingItemId || parsed.itemId;
+        const existingUserId = typeof existingNegotiationEntry["userId"] === "string" ? existingNegotiationEntry["userId"] : "";
+        const existingPeerId = typeof existingNegotiationEntry["peerId"] === "string" ? existingNegotiationEntry["peerId"] : "";
+        const existingRoleType = typeof existingNegotiationEntry["roleType"] === "string" ? existingNegotiationEntry["roleType"] : "";
+        const inferredRoleType =
+            proposalStatus === "seller_countered" || proposalStatus === "seller_accepted" ? "seller" : "buyer";
+        const userId = existingUserId || (inferredRoleType === "buyer" ? buyerId : sellerId);
+        const peerId = existingPeerId || (inferredRoleType === "buyer" ? sellerId : buyerId);
         const negotiationsByConversation = {
             ...(record?.negotiationsByConversation ?? {}),
             [body.conversationId]: {
                 ...existingNegotiationEntry,
                 conversationId: body.conversationId,
+                buyerId,
+                sellerId,
+                itemId,
+                userId,
+                peerId,
+                roleType: existingRoleType || inferredRoleType,
                 status: proposalStatus || existingStatus || "ongoing",
                 startedAt: existingStartedAt || now,
                 updatedAt: now,
