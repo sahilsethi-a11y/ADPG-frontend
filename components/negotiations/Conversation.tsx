@@ -108,7 +108,7 @@ export default function Conversation(props: Readonly<PropsT>) {
             const raw = Array.isArray(payload?.messages) ? payload.messages : [];
 
             const parsed: Message[] = raw
-                .map((item) => {
+                .map((item: unknown) => {
                     if (!item || typeof item !== "object") return null;
                     const record = item as Record<string, unknown>;
                     const id = typeof record.id === "string" ? record.id : "";
@@ -132,7 +132,7 @@ export default function Conversation(props: Readonly<PropsT>) {
                         sentAt,
                     } as Message;
                 })
-                .filter((msg): msg is Message => Boolean(msg));
+                .filter((msg: Message | null): msg is Message => Boolean(msg));
 
             if (!parsed.length) return;
             shouldAutoScrollRef.current = true;

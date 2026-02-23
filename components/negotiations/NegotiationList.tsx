@@ -324,6 +324,8 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
             </div>
             <div className="flex flex-col gap-6">
                 {mergedNegotiations.map((i) => {
+                        const proposal = proposalMap[i.conversationId];
+                        const bucketSummaries = proposal?.bucketSummaries ?? [];
                         const altText = [i.vehicle.year, i.vehicle.brand, i.vehicle.model, i.vehicle.variant]
                             .filter(Boolean)
                             .join(" ")
@@ -367,18 +369,18 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                                 </span>
                             </div>
                             {i.message && <p className="text-gray-700 text-sm mb-3">{i.message}</p>}
-                            {proposalMap[i.conversationId]?.bucketSummaries?.length ? (
+                            {bucketSummaries.length ? (
                                 <div className="mb-3 text-sm text-gray-700">
                                     <div className="font-medium">
-                                        {proposalMap[i.conversationId].bucketSummaries.length} buckets •{" "}
-                                        {proposalMap[i.conversationId].bucketSummaries.reduce(
+                                        {bucketSummaries.length} buckets •{" "}
+                                        {bucketSummaries.reduce(
                                             (acc: number, b: ProposalBucketSummary) => acc + (b.totalUnits || 0),
                                             0
                                         )}{" "}
                                         cars
                                     </div>
                                     <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-600">
-                                        {proposalMap[i.conversationId].bucketSummaries.map((b: ProposalBucketSummary, idx: number) => (
+                                        {bucketSummaries.map((b: ProposalBucketSummary, idx: number) => (
                                             <span key={`${i.conversationId}-${idx}`} className="px-2 py-0.5 rounded-full border border-stroke-light">
                                                 {[b.year, b.color, b.variant, b.condition, b.bodyType].filter(Boolean).join(" • ")}
                                             </span>
