@@ -557,8 +557,8 @@ export default function VehicleCardListing({
   }, [bucketMeta, filteredVehicles, hasFilters, sellerId]);
 
   const vehiclePool = filteredVehicles;
-  const [sortBy, setSortBy] = useState("sortBy=price&sortOrder=asc");
-  const sortByRef = useRef("sortBy=price&sortOrder=asc");
+  const [sortBy, setSortBy] = useState("sortBy=year&sortOrder=desc");
+  const sortByRef = useRef("sortBy=year&sortOrder=desc");
   const [bucketPage, setBucketPage] = useState(1);
   const bucketPageSize = 12;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircleIcon, CheckCircleIcon, ClockIcon, MessageSquareIcon, SearchIcon, UserIcon } from "@/components/Icons";
 import Input from "@/elements/Input";
 import Button from "@/elements/Button";
@@ -57,6 +57,20 @@ type PropsT = {
     roleType?: string;
 };
 
+type ProposalBucketSummary = {
+    totalUnits?: number;
+    year?: number;
+    color?: string;
+    variant?: string;
+    condition?: string;
+    bodyType?: string;
+};
+
+type ProposalSummary = {
+    status?: string;
+    bucketSummaries?: ProposalBucketSummary[];
+};
+
 const filters = [
     {
         label: "All",
@@ -78,12 +92,10 @@ const filters = [
 
 export default function NegotiationList({ data: initialData, userId, roleType }: Readonly<PropsT>) {
     const [data, setData] = useState<Negotiation>(initialData);
-    const [extraNegotiations, setExtraNegotiations] = useState<Content[]>([]);
     const [proposalStatusMap, setProposalStatusMap] = useState<Record<string, string>>({});
-    const [proposalMap, setProposalMap] = useState<Record<string, any>>({});
+    const [proposalMap, setProposalMap] = useState<Record<string, ProposalSummary>>({});
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [hasLoadedPrimary, setHasLoadedPrimary] = useState(false);
-    const [hasLoadedFallback, setHasLoadedFallback] = useState(false);
     const [hasLoadedProposalStatuses, setHasLoadedProposalStatuses] = useState(false);
     const [hasRenderedTopCardStatus, setHasRenderedTopCardStatus] = useState(false);
     const [hasMinLoaderDelay, setHasMinLoaderDelay] = useState(false);
@@ -91,80 +103,138 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
     const [query, setQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState(filters[0].value);
     const router = useRouter();
+    const role = roleType?.toLowerCase() === "buyer" ? "buyer" : "seller";
 
     const mergedNegotiations = useMemo(() => {
-        return [
-            ...new Map(
-                [...extraNegotiations, ...(data?.content ?? [])].map((i) => [i.conversationId, i])
-            ).values(),
-        ].sort((a, b) => {
+        return [...(data?.content ?? [])].sort((a, b) => {
             const at = new Date((a.startedAt || a.updatedAt) ?? 0).getTime();
             const bt = new Date((b.startedAt || b.updatedAt) ?? 0).getTime();
             return bt - at;
         });
-    }, [extraNegotiations, data]);
+    }, [data]);
 
     useEffect(() => {
         const t = window.setTimeout(() => setHasMinLoaderDelay(true), 2000);
         return () => window.clearTimeout(t);
     }, []);
 
-    useEffect(() => {
-        const items =
-            data?.content?.map((i) => {
-                const role = i.roleType?.toLowerCase();
-                const buyerId = role === "buyer" ? i.peerId : i.userId;
-                const sellerId = role === "buyer" ? i.userId : i.peerId;
-                return {
-                    conversationId: i.conversationId,
-                    buyerId,
-                    sellerId,
-                    userId: i.userId,
-                    peerId: i.peerId,
-                    roleType: i.roleType,
-                    itemId: i.itemId,
-                };
-            }) ?? [];
-
-        if (!items.length) return;
-
-        fetch("/api/negotiation-index", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items }),
-        }).catch(() => {});
-    }, [data]);
-
-    const applyFilter = async (page = initialData.currentPage, size = initialData.size) => {
+    const applyFilter = useCallback(async (page = initialData.currentPage, size = initialData.size) => {
         try {
-            const params = {
-                userId,
-                status: activeFilter,
-                query,
-                page,
-                size,
-            };
+            const res = await fetch(`/api/negotiation-index?userId=${encodeURIComponent(userId)}&role=${role}`, {
+                cache: "no-store",
+            });
+            if (!res.ok) return;
+            const payload = await res.json();
+            const list = (payload?.items as Array<Record<string, unknown>>) ?? [];
 
-            const res = await api.get<{ data: Negotiation }>("/chat/api/negotiations", { params });
-            const payload = res?.data;
-            setData(payload);
+            const hydrated = await Promise.all(
+                list
+                    .filter((i) => i?.conversationId)
+                    .map(async (i) => {
+                        let vehicle: Content["vehicle"] | undefined;
+                        try {
+                            const v = await api.get<{ data: Record<string, unknown> }>("/inventory/api/v1/inventory/getInventoryDetails", {
+                                params: { id: i.itemId as string | number },
+                            });
+                            const d = v.data;
+                            vehicle = {
+                                id: String(d.id ?? ""),
+                                brand: String(d.brand ?? ""),
+                                model: String(d.model ?? ""),
+                                variant: String(d.variant ?? ""),
+                                year: Number(d.year) || 0,
+                                price: Number(d.price) || 0,
+                                currency: String(d.currency ?? "USD"),
+                                allowPriceNegotiations: true,
+                                mainImageUrl: (Array.isArray(d.imageUrls) ? String(d.imageUrls[0] ?? "") : "") || String(d.mainImageUrl ?? ""),
+                                createTime: "",
+                                imageUrls: Array.isArray(d.imageUrls) ? (d.imageUrls as string[]) : [],
+                            };
+                        } catch {}
+
+                        if (!vehicle) return null;
+
+                        const conversationId = String(i.conversationId ?? "");
+                        const itemId = Number(i.itemId) || 0;
+                        return {
+                            conversationId,
+                            userId: String(i.userId ?? userId),
+                            peerId: String(i.peerId ?? ""),
+                            itemId,
+                            updatedAt: String(i.updatedAt ?? ""),
+                            roleType: String(i.roleType ?? (role === "seller" ? "buyer" : "seller")),
+                            name: String(i.name ?? (role === "seller" ? "Buyer" : "Seller")),
+                            lastActivity: String(i.lastActivity ?? "Just now"),
+                            status: String(i.status ?? "ongoing"),
+                            startedAt: String(i.startedAt ?? ""),
+                            message: String(i.message ?? "New negotiation started"),
+                            agreedPrice: i.agreedPrice ? String(i.agreedPrice) : undefined,
+                            buyerName: i.buyerName ? String(i.buyerName) : undefined,
+                            sellerName: i.sellerName ? String(i.sellerName) : undefined,
+                            vehicle,
+                        } as Content;
+                    })
+            );
+
+            const search = query.trim().toLowerCase();
+            let filtered = (hydrated.filter(Boolean) as Content[]).sort((a, b) => {
+                const at = new Date((a.startedAt || a.updatedAt) ?? 0).getTime();
+                const bt = new Date((b.startedAt || b.updatedAt) ?? 0).getTime();
+                return bt - at;
+            });
+
+            if (activeFilter) {
+                filtered = filtered.filter((i) => (i.status || "").toLowerCase() === activeFilter.toLowerCase());
+            }
+            if (search) {
+                filtered = filtered.filter((i) =>
+                    [
+                        i.vehicle?.brand,
+                        i.vehicle?.model,
+                        i.vehicle?.variant,
+                        i.buyerName,
+                        i.sellerName,
+                        i.name,
+                        i.conversationId,
+                    ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .toLowerCase()
+                        .includes(search)
+                );
+            }
+
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / size));
+            const safePage = Math.min(Math.max(page, 1), totalPages);
+            const start = (safePage - 1) * size;
+            const content = filtered.slice(start, start + size);
+            setData({
+                content,
+                currentPage: safePage,
+                first: safePage === 1,
+                last: safePage === totalPages,
+                size,
+                totalItems,
+                totalPages,
+            });
         } catch (err) {
-            console.log("Failed to fetch more negotiations", err);
+            console.log("Failed to fetch negotiations from JSONBin", err);
         }
-    };
+    }, [activeFilter, initialData.currentPage, initialData.size, query, role, userId]);
 
     useEffect(() => {
         const interval = window.setInterval(() => {
-            applyFilter();
+            applyFilter(data.currentPage, data.size);
         }, 5000);
         return () => window.clearInterval(interval);
-    }, [activeFilter, query, initialData.currentPage, initialData.size]);
+    }, [activeFilter, applyFilter, data.currentPage, data.size, query, role, userId]);
 
     useEffect(() => {
         let isActive = true;
         const loadPrimary = async () => {
             try {
-                await applyFilter(initialData.currentPage, initialData.size);
+                await applyFilter(1, initialData.size);
             } finally {
                 if (isActive) setHasLoadedPrimary(true);
             }
@@ -173,74 +243,14 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
         return () => {
             isActive = false;
         };
-    }, []);
+    }, [applyFilter, initialData.size]);
 
     useEffect(() => {
-        const role = roleType?.toLowerCase() === "buyer" ? "buyer" : "seller";
-        const loadFallback = async () => {
-            try {
-                const res = await fetch(`/api/negotiation-index?userId=${encodeURIComponent(userId)}&role=${role}`, {
-                    cache: "no-store",
-                });
-                if (!res.ok) return;
-                const payload = await res.json();
-                const list = (payload?.items as any[]) ?? [];
-                const existingIds = new Set((data?.content ?? []).map((i) => i.conversationId));
-
-                const fallback = await Promise.all(
-                    list
-                        .filter((i) => i?.conversationId && !existingIds.has(i.conversationId))
-                        .map(async (i) => {
-                            let vehicle: Content["vehicle"] | undefined;
-                            try {
-                                const v = await api.get<{ data: any }>("/inventory/api/v1/inventory/getInventoryDetails", {
-                                    params: { id: i.itemId },
-                                });
-                                const d = v.data;
-                                vehicle = {
-                                    id: d.id,
-                                    brand: d.brand,
-                                    model: d.model,
-                                    variant: d.variant,
-                                    year: Number(d.year) || 0,
-                                    price: Number(d.price) || 0,
-                                    currency: d.currency,
-                                    allowPriceNegotiations: true,
-                                    mainImageUrl: d.imageUrls?.[0] || d.mainImageUrl || "",
-                                    createTime: "",
-                                    imageUrls: d.imageUrls || [],
-                                };
-                            } catch {}
-
-                            return {
-                                conversationId: i.conversationId,
-                                userId: i.userId || userId,
-                                peerId: i.peerId || "",
-                                itemId: i.itemId,
-                                updatedAt: i.updatedAt || "",
-                                roleType: role === "seller" ? "buyer" : "seller",
-                                name: role === "seller" ? "Buyer" : "Seller",
-                                lastActivity: "Just now",
-                                status: i.status || "ongoing",
-                                startedAt: i.startedAt || "",
-                                message: i.message || "New negotiation started",
-                                agreedPrice: i.agreedPrice,
-                                buyerName: i.buyerName,
-                                sellerName: i.sellerName,
-                                vehicle: vehicle as any,
-                            } as Content;
-                        })
-                );
-
-                setExtraNegotiations(fallback.filter((i) => i?.vehicle));
-            } catch {}
-            setHasLoadedFallback(true);
-        };
-        loadFallback();
-    }, [data, roleType, userId]);
+        applyFilter(1, data.size);
+    }, [activeFilter, applyFilter, data.size, query]);
 
     useEffect(() => {
-        if (hasLoadedPrimary && hasLoadedFallback && hasLoadedProposalStatuses) {
+        if (hasLoadedPrimary && hasLoadedProposalStatuses) {
             const top = mergedNegotiations[0];
             if (!top) {
                 setHasRenderedTopCardStatus(true);
@@ -249,13 +259,13 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                 setHasRenderedTopCardStatus(Boolean(topStatus));
             }
         }
-    }, [hasLoadedPrimary, hasLoadedFallback, hasLoadedProposalStatuses, mergedNegotiations, proposalStatusMap]);
+    }, [hasLoadedPrimary, hasLoadedProposalStatuses, mergedNegotiations, proposalStatusMap]);
 
     useEffect(() => {
-        if (hasLoadedPrimary && hasLoadedFallback && hasLoadedProposalStatuses && hasRenderedTopCardStatus && hasMinLoaderDelay) {
+        if (hasLoadedPrimary && hasLoadedProposalStatuses && hasRenderedTopCardStatus && hasMinLoaderDelay) {
             setIsInitialLoading(false);
         }
-    }, [hasLoadedPrimary, hasLoadedFallback, hasLoadedProposalStatuses, hasRenderedTopCardStatus, hasMinLoaderDelay]);
+    }, [hasLoadedPrimary, hasLoadedProposalStatuses, hasRenderedTopCardStatus, hasMinLoaderDelay]);
 
     useEffect(() => {
         setHasLoadedProposalStatuses(false);
@@ -273,10 +283,10 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                 const res = await fetch(`/api/negotiation-proposals?ids=${ids.join(",")}`, { cache: "no-store" });
                 if (!res.ok) return;
                 const payload = await res.json();
-                const proposals = payload?.proposals ?? {};
+                const proposals = (payload?.proposals ?? {}) as Record<string, ProposalSummary>;
                 const next: Record<string, string> = {};
                 for (const [key, value] of Object.entries(proposals)) {
-                    const status = (value as any)?.status;
+                    const status = value?.status;
                     if (status) next[key] = String(status);
                 }
                 if (!isActive) return;
@@ -292,11 +302,6 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
             isActive = false;
         };
     }, [mergedNegotiations]);
-
-    const navigateToDetail = (i: Content) => {
-        const url = "/vehicles/" + i.itemId;
-        router.push(url);
-    };
 
     const navigateToConversation = (i: Content) => {
         router.push("/my-negotiations/" + i.conversationId);
@@ -367,13 +372,13 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                                     <div className="font-medium">
                                         {proposalMap[i.conversationId].bucketSummaries.length} buckets •{" "}
                                         {proposalMap[i.conversationId].bucketSummaries.reduce(
-                                            (acc: number, b: any) => acc + (b.totalUnits || 0),
+                                            (acc: number, b: ProposalBucketSummary) => acc + (b.totalUnits || 0),
                                             0
                                         )}{" "}
                                         cars
                                     </div>
                                     <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-600">
-                                        {proposalMap[i.conversationId].bucketSummaries.map((b: any, idx: number) => (
+                                        {proposalMap[i.conversationId].bucketSummaries.map((b: ProposalBucketSummary, idx: number) => (
                                             <span key={`${i.conversationId}-${idx}`} className="px-2 py-0.5 rounded-full border border-stroke-light">
                                                 {[b.year, b.color, b.variant, b.condition, b.bodyType].filter(Boolean).join(" • ")}
                                             </span>
@@ -403,6 +408,11 @@ export default function NegotiationList({ data: initialData, userId, roleType }:
                     </div>
                 );
                 })}
+                {!isInitialLoading && mergedNegotiations.length === 0 ? (
+                    <div className="text-center text-gray-600 p-8 rounded-lg border border-dashed border-gray-300">
+                        <p>You have no negotiations</p>
+                    </div>
+                ) : null}
             </div>
             {isInitialLoading ? (
                 <div className="fixed inset-0 z-30 flex items-center justify-center bg-white/70">

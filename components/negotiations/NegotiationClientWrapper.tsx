@@ -452,6 +452,16 @@ export default function NegotiationClientWrapper({
         return false;
     }, [activeProposal, isBuyer, isSeller]);
 
+    const activeProposalUnits = useMemo(() => {
+        if (!activeProposal) return 0;
+        return activeProposal.bucketSummaries.reduce((acc, bucket) => acc + (Number(bucket.totalUnits) || 0), 0);
+    }, [activeProposal]);
+
+    const logisticsFee = useMemo(() => {
+        if (logisticsPartner !== "UGR") return 0;
+        return activeProposalUnits * 600;
+    }, [activeProposalUnits, logisticsPartner]);
+
     const acceptProposal = useCallback(async () => {
         if (!activeProposal) return;
         const next: ActiveProposal = {
@@ -515,6 +525,8 @@ export default function NegotiationClientWrapper({
                         total: activeProposal.finalPrice,
                         downpayment: activeProposal.downpaymentAmount,
                         pending: activeProposal.remainingBalance,
+                        logisticsFees: logisticsFee,
+                        totalWithLogistics: activeProposal.finalPrice + logisticsFee,
                     },
                     selectedPort: activeProposal.selectedPort,
                     destinationPort: logisticsPartner === "UGR" ? destinationPort : undefined,
@@ -533,7 +545,7 @@ export default function NegotiationClientWrapper({
             setCartError("Failed to add to cart. Please try again.");
             setCartLoading(false);
         }
-    }, [activeProposal, conversationId, logisticsPartner, router, sellerId, userId, vehicleId]);
+    }, [activeProposal, conversationId, destinationPort, logisticsFee, logisticsPartner, router, sellerId, sellerName, userId, vehicleId]);
 
     return (
         <>
@@ -729,11 +741,23 @@ export default function NegotiationClientWrapper({
                             </div>
 
                             <div className="grid gap-4 md:grid-cols-2">
-                                <div className="border border-stroke-light rounded-lg p-3 space-y-2 text-sm bg-gray-50/60">
+                                <div className="border border-stroke-light rounded-lg p-3 space-y-4 text-sm bg-gray-50/60">
                                     <div className="flex justify-between">
-                                        <span>Total</span>
+                                        <span>Negotiated total</span>
                                         <span className="font-semibold">
                                             {formatPrice(activeProposal.finalPrice, currency || "USD")}
+                                        </span>
+                                    </div>
+                                    {logisticsPartner === "UGR" ? (
+                                        <div className="flex justify-between">
+                                            <span>Logistics fees ({activeProposalUnits} x $600)</span>
+                                            <span className="font-semibold">{formatPrice(logisticsFee, currency || "USD")}</span>
+                                        </div>
+                                    ) : null}
+                                    <div className="flex justify-between">
+                                        <span>Total amount</span>
+                                        <span className="font-semibold">
+                                            {formatPrice(activeProposal.finalPrice + logisticsFee, currency || "USD")}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
@@ -758,7 +782,7 @@ export default function NegotiationClientWrapper({
                                             onChange={(e) => setLogisticsPartner(e.target.value as "UGR" | "None")}
                                             className="w-full px-3 py-2 border border-stroke-light rounded-lg text-sm text-gray-900 bg-white"
                                         >
-                                            <option value="UGR">UGR</option>
+                                            <option value="UGR">UGR Lines</option>
                                             <option value="None">None</option>
                                         </select>
                                     </div>

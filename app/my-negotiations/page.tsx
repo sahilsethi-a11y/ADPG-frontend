@@ -1,7 +1,6 @@
 import NegotiationList, { type Negotiation } from "@/components/negotiations/NegotiationList";
 import { api } from "@/lib/api/server-request";
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { Suspense } from "react";
 import LoadingNegotiationsPage from "./loading";
 
@@ -12,8 +11,15 @@ async function MyNegotiationsContent() {
         isAuthRequired: false,
     });
     const resolvedUserId = userData.data?.userId || tokenValue;
-    const resp = await api.get<{ data: Negotiation }>("/chat/api/negotiations", { params: { userId: resolvedUserId, size: 10 } });
-    const data = resp.data;
+    const data: Negotiation = {
+        content: [],
+        currentPage: 1,
+        first: true,
+        last: true,
+        size: 10,
+        totalItems: 0,
+        totalPages: 1,
+    };
     const roleType = userData.data?.roleType;
 
     return (
@@ -23,18 +29,6 @@ async function MyNegotiationsContent() {
                 <p className="text-gray-600">Track your ongoing vehicle negotiations and agreements</p>
             </div>
             <NegotiationList data={data} userId={resolvedUserId} roleType={roleType} />
-            {!data?.content?.length ? (
-                <div className="text-center text-gray-600 mt-20 p-8 rounded-lg border border-dashed border-gray-300">
-                    <p className="mb-4">You have no negotiations at the moment.</p>
-                    <p>
-                        Browse{" "}
-                        <Link className="text-brand-blue underline" href="/vehicles">
-                            vehicles
-                        </Link>{" "}
-                        and start negotiating today!
-                    </p>
-                </div>
-            ) : null}
         </main>
     );
 }

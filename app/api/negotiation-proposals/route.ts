@@ -7,6 +7,20 @@ const binId = process.env.JSONBIN_BIN_ID;
 type ProposalRecord = {
     proposalsByConversation?: Record<string, unknown>;
     negotiationsByConversation?: Record<string, unknown>;
+    negotiationMessagesByConversation?: Record<string, unknown>;
+};
+
+type ProposalPayload = Record<string, unknown> & { status?: string };
+
+type NegotiationMessage = {
+    senderId: string;
+    content: string;
+    id: string;
+    conversationId: string;
+    createdAt: string;
+    sentAt: string;
+    name: string;
+    contentType: "info";
 };
 
 const parseConversationId = (conversationId: string) => {
@@ -19,6 +33,93 @@ const parseConversationId = (conversationId: string) => {
         sellerId: parts[1] || "",
         itemId: parts[2] || "",
     };
+};
+
+const parseAmount = (value: unknown) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : undefined;
+};
+
+const formatAmount = (value: unknown) => {
+    const num = parseAmount(value);
+    if (num === undefined) return "";
+    return `$${Math.round(num).toLocaleString()}`;
+};
+
+const parsePercent = (value: unknown) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+};
+
+const getProposalInfoMessage = (params: {
+    conversationId: string;
+    proposal: ProposalPayload;
+    buyerId: string;
+    sellerId: string;
+    nowIso: string;
+}): NegotiationMessage | null => {
+    const { conversationId, proposal, buyerId, sellerId, nowIso } = params;
+    const status = typeof proposal.status === "string" ? proposal.status : "";
+    const finalPrice = formatAmount(proposal.finalPrice);
+    const discountPercent = parsePercent(proposal.discountPercent);
+    const downpaymentPercent = parsePercent(proposal.downpaymentPercent);
+    const id = `proposal_${conversationId}_${nowIso}`;
+    const finalPriceText = finalPrice ? ` Final price: ${finalPrice}.` : "";
+    const downpaymentText = ` Downpayment: ${downpaymentPercent}%.`;
+
+    if (status === "buyer_proposed") {
+        return {
+            senderId: buyerId || "buyer",
+            name: "Buyer",
+            content: `Buyer submitted a proposal: ${discountPercent}% discount.${finalPriceText}${downpaymentText}`,
+            id,
+            conversationId,
+            createdAt: nowIso,
+            sentAt: nowIso,
+            contentType: "info",
+        };
+    }
+
+    if (status === "buyer_countered") {
+        return {
+            senderId: buyerId || "buyer",
+            name: "Buyer",
+            content: `Buyer submitted a counter offer: ${discountPercent}% discount.${finalPriceText}${downpaymentText}`,
+            id,
+            conversationId,
+            createdAt: nowIso,
+            sentAt: nowIso,
+            contentType: "info",
+        };
+    }
+
+    if (status === "seller_countered") {
+        return {
+            senderId: sellerId || "seller",
+            name: "Seller",
+            content: `Seller submitted a counter offer: ${discountPercent}% discount.${finalPriceText}${downpaymentText}`,
+            id,
+            conversationId,
+            createdAt: nowIso,
+            sentAt: nowIso,
+            contentType: "info",
+        };
+    }
+
+    if (status === "seller_accepted") {
+        return {
+            senderId: "system",
+            name: "System",
+            content: "Proposal accepted. Terms have been confirmed.",
+            id,
+            conversationId,
+            createdAt: nowIso,
+            sentAt: nowIso,
+            contentType: "info",
+        };
+    }
+
+    return null;
 };
 
 async function readBin(): Promise<ProposalRecord> {
@@ -94,12 +195,15 @@ export async function GET(request: Request) {
         const proposal = (proposalsByConversation as Record<string, unknown>)[conversationId] ?? null;
         const negotiationsByConversation = record?.negotiationsByConversation ?? {};
         const negotiationEntry = (negotiationsByConversation as Record<string, unknown>)[conversationId];
+        const negotiationMessagesByConversation = record?.negotiationMessagesByConversation ?? {};
+        const rawMessages = (negotiationMessagesByConversation as Record<string, unknown>)[conversationId];
+        const messages = Array.isArray(rawMessages) ? rawMessages : [];
         const negotiationStatus =
             typeof negotiationEntry === "object" && negotiationEntry !== null && typeof (negotiationEntry as Record<string, unknown>).status === "string"
                 ? ((negotiationEntry as Record<string, unknown>).status as string)
                 : null;
 
-        return NextResponse.json({ proposal, negotiationStatus });
+        return NextResponse.json({ proposal, negotiationStatus, messages });
     } catch (err) {
         console.error("Negotiation proposals GET error:", err);
         return NextResponse.json({ error: (err as Error).message }, { status: 500 });
@@ -166,6 +270,19 @@ export async function POST(request: Request) {
         const latestRecord = await readBin();
         const latestProposals = latestRecord?.proposalsByConversation ?? {};
         const latestNegotiations = latestRecord?.negotiationsByConversation ?? {};
+        const latestMessagesByConversation = latestRecord?.negotiationMessagesByConversation ?? {};
+        const latestConversationMessagesRaw = (latestMessagesByConversation as Record<string, unknown>)[body.conversationId];
+        const latestConversationMessages = Array.isArray(latestConversationMessagesRaw) ? latestConversationMessagesRaw : [];
+        const infoMessage = getProposalInfoMessage({
+            conversationId: body.conversationId,
+            proposal: body.proposal,
+            buyerId,
+            sellerId,
+            nowIso: now,
+        });
+        const nextConversationMessages = infoMessage
+            ? [...latestConversationMessages, infoMessage].slice(-300)
+            : latestConversationMessages;
 
         await writeBin({
             ...latestRecord,
@@ -176,6 +293,10 @@ export async function POST(request: Request) {
             negotiationsByConversation: {
                 ...latestNegotiations,
                 ...negotiationsByConversation,
+            },
+            negotiationMessagesByConversation: {
+                ...latestMessagesByConversation,
+                [body.conversationId]: nextConversationMessages,
             },
         });
 

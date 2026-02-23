@@ -63,6 +63,8 @@ export type NegotiationOrder = {
         total: number;
         downpayment: number;
         pending: number;
+        logisticsFees?: number;
+        totalWithLogistics?: number;
     };
 };
 
@@ -111,7 +113,26 @@ export default function CartList({
     const selectedNegotiationsCount = Object.values(selectedNegotiations).filter(Boolean).length;
     const selectedItemCount = selectedItems.length + selectedNegotiationsCount;
     const fobTotal = selectedItems.reduce((acc, i) => acc + i.quantity * i.price, 0);
-    const logisticsFees = selectedItems.reduce((acc, i) => acc + i.quantity * i.logisticPrice, 0);
+    const selectedNegotiationOrders = negotiationOrders.filter((o) => selectedNegotiations[o.conversationId]);
+    const regularLogisticsFees = selectedItems.reduce((acc, i) => acc + i.quantity * i.logisticPrice, 0);
+    const negotiatedLogisticsFees = selectedNegotiationOrders.reduce((acc, order) => {
+        if (order.logisticsPartner !== "UGR") return acc;
+        const units = order.items.reduce((sum, item) => sum + (item.totalUnits || 0), 0);
+        return acc + units * 600;
+    }, 0);
+    const logisticsBucketBreakdown = selectedNegotiationOrders.flatMap((order) => {
+        if (order.logisticsPartner !== "UGR") return [];
+        return order.items
+            .filter((item) => (item.totalUnits || 0) > 0)
+            .map((item) => ({
+                key: `${order.conversationId}_${item.bucketKey}`,
+                name: item.name,
+                units: item.totalUnits || 0,
+                fee: (item.totalUnits || 0) * 600,
+                currency: item.currency || currency,
+            }));
+    });
+    const logisticsFees = regularLogisticsFees + negotiatedLogisticsFees;
     const negotiatedTotal = negotiationOrders.reduce(
         (acc, o) => acc + (selectedNegotiations[o.conversationId] ? o.totals?.total ?? 0 : 0),
         0
@@ -142,8 +163,6 @@ export default function CartList({
     };
 
     const currency = list?.[0]?.currency || negotiationOrders?.[0]?.items?.[0]?.currency;
-    const selectedNegotiationOrders = negotiationOrders.filter((o) => selectedNegotiations[o.conversationId]);
-
     return (
         <div className="grid lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
@@ -202,6 +221,15 @@ export default function CartList({
                             <span>Logistics Fees:</span>
                             <span>{formatPrice(logisticsFees, currency)}</span>
                         </div>
+                        {logisticsBucketBreakdown.length > 0 ? (
+                            <div className="space-y-1 text-xs text-gray-500">
+                                {logisticsBucketBreakdown.map((b) => (
+                                    <div key={b.key}>
+                                        {b.name}: $600 x {b.units} cars = {formatPrice(b.fee, b.currency)}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
                         <div className="flex justify-between">
                             <span>Platform fees:</span>
                             <span>Calculated at checkout</span>
@@ -429,6 +457,20 @@ const NegotiationOrderCard = ({
     onToggle?: () => void;
     onRemove?: () => void;
 }) => {
+    const totalUnits = order.items.reduce((acc, i) => acc + (i.totalUnits || 0), 0);
+    const ugrLogisticsFees = order.logisticsPartner === "UGR" ? totalUnits * 600 : 0;
+    const bucketLogisticsBreakdown =
+        order.logisticsPartner === "UGR"
+            ? order.items
+                  .filter((item) => (item.totalUnits || 0) > 0)
+                  .map((item) => ({
+                      key: item.bucketKey,
+                      name: item.name,
+                      units: item.totalUnits || 0,
+                      fee: (item.totalUnits || 0) * 600,
+                      currency: item.currency || currencyFallback,
+                  }))
+            : [];
     return (
         <div className="p-4 border border-stroke-light rounded-xl">
             <div className="flex flex-col gap-4 md:flex-row">
@@ -448,12 +490,24 @@ const NegotiationOrderCard = ({
                             <h3 className="text-lg text-brand-blue">Negotiated Order</h3>
                             <p className="text-sm text-gray-600">
                                 {order.items.length} buckets •{" "}
-                                {order.items.reduce((acc, i) => acc + (i.totalUnits || 0), 0)} units
+                                {totalUnits} units
                             </p>
                             <div className="mt-2 space-y-1 text-sm text-gray-600">
                                 <div>From: {order.selectedPort || "—"}</div>
                                 <div>To: {order.destinationPort || "—"}</div>
                                 <div>Logistics: {order.logisticsPartner}</div>
+                                {order.logisticsPartner === "UGR" ? (
+                                    <>
+                                        <div>Logistics fees: {formatPrice(ugrLogisticsFees, order.items[0]?.currency || currencyFallback)}</div>
+                                        <div className="space-y-1 text-xs text-gray-500">
+                                            {bucketLogisticsBreakdown.map((b) => (
+                                                <div key={b.key}>
+                                                    {b.name}: $600 x {b.units} cars = {formatPrice(b.fee, b.currency)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : null}
                             </div>
                             <div className="mt-2">
                                 <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium">

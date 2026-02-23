@@ -1,16 +1,14 @@
 "use client";
 
-import { ChangeEvent, JSX, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import Input from "@/elements/Input";
-import { AlertCircleIcon, CheckCircleIcon, DollerIcon, SendIcon, Shield } from "@/components/Icons";
+import { AlertCircleIcon, CheckCircleIcon, SendIcon, Shield } from "@/components/Icons";
 import Button from "@/elements/Button";
 import Modal from "@/elements/Modal";
 import { Client } from "@stomp/stompjs";
 import { config } from "@/lib/config";
 import { api } from "@/lib/api/client-request";
 import { FetchError } from "@/lib/api/shared";
-import { useRouter } from "next/navigation";
-import AddToCartButton from "@/components/buyer/AddToCardButton";
 
 type PropsT = {
     conversationId: string;
@@ -45,17 +43,38 @@ export type NegotiationInfo = {
     roleType: string;
 };
 
-export default function Conversation(props: Readonly<PropsT>) {
-    const { userId: senderId, conversationId, initialChats, currency, negotiationInfo: initialNegotiationInfo, role } = props;
-    const [currentUser, chattingWith, vehicleId] = conversationId.split("_");
+const getMessageTimestamp = (message: Message) => {
+    const ts = Date.parse(message.createdAt || message.sentAt || "");
+    return Number.isFinite(ts) ? ts : 0;
+};
 
-    const router = useRouter();
+const mergeMessages = (current: Message[], incoming: Message[]) => {
+    const byId = new Map<string, Message>();
+
+    for (const msg of current) {
+        if (!msg?.id) continue;
+        byId.set(msg.id, msg);
+    }
+
+    for (const msg of incoming) {
+        if (!msg?.id || byId.has(msg.id)) continue;
+        byId.set(msg.id, msg);
+    }
+
+    return Array.from(byId.values())
+        .sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b))
+        .slice(-500);
+};
+
+export default function Conversation(props: Readonly<PropsT>) {
+    const { userId: senderId, conversationId, initialChats, negotiationInfo: initialNegotiationInfo } = props;
+    const [currentUser, chattingWith, vehicleId] = conversationId.split("_");
 
     const [input, setInput] = useState("");
     const [typing, setTyping] = useState("");
     const [agreeAmount, setAgreeAmount] = useState("");
     const [showOtpModal, setShowOtpModal] = useState(false);
-    const [negotiationInfo, setNegotiationInfo] = useState<NegotiationInfo>(initialNegotiationInfo);
+    const [, setNegotiationInfo] = useState<NegotiationInfo>(initialNegotiationInfo);
     const [messages, setMessages] = useState<Message[]>(initialChats ?? []);
     const [otpError, setOtpError] = useState("");
 
@@ -77,6 +96,49 @@ export default function Conversation(props: Readonly<PropsT>) {
         shouldAutoScrollRef.current = true;
         setMessages((prev) => [...prev, payload].slice(-500));
     }, []);
+
+    const loadPersistedProposalMessages = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/negotiation-proposals?conversationId=${encodeURIComponent(conversationId)}`, {
+                cache: "no-store",
+            });
+            if (!res.ok) return;
+
+            const payload = await res.json();
+            const raw = Array.isArray(payload?.messages) ? payload.messages : [];
+
+            const parsed: Message[] = raw
+                .map((item) => {
+                    if (!item || typeof item !== "object") return null;
+                    const record = item as Record<string, unknown>;
+                    const id = typeof record.id === "string" ? record.id : "";
+                    const content = typeof record.content === "string" ? record.content : "";
+                    const msgConversationId = typeof record.conversationId === "string" ? record.conversationId : conversationId;
+                    const sender = typeof record.senderId === "string" ? record.senderId : "system";
+                    const name = typeof record.name === "string" ? record.name : "System";
+                    const contentType = record.contentType === "price" || record.contentType === "chat" ? record.contentType : "info";
+                    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
+                    const sentAt = typeof record.sentAt === "string" ? record.sentAt : createdAt;
+
+                    if (!id || !content) return null;
+                    return {
+                        id,
+                        content,
+                        senderId: sender,
+                        conversationId: msgConversationId,
+                        name,
+                        contentType,
+                        createdAt,
+                        sentAt,
+                    } as Message;
+                })
+                .filter((msg): msg is Message => Boolean(msg));
+
+            if (!parsed.length) return;
+            shouldAutoScrollRef.current = true;
+            setMessages((prev) => mergeMessages(prev, parsed));
+        } catch {}
+    }, [conversationId]);
 
     const handleTypingSubcriptions = useCallback(
         (body: string) => {
@@ -130,6 +192,17 @@ export default function Conversation(props: Readonly<PropsT>) {
         }
     }, [messages, typing]);
 
+    useEffect(() => {
+        const initial = window.setTimeout(() => {
+            loadPersistedProposalMessages();
+        }, 0);
+        const interval = window.setInterval(loadPersistedProposalMessages, 5000);
+        return () => {
+            window.clearTimeout(initial);
+            window.clearInterval(interval);
+        };
+    }, [loadPersistedProposalMessages]);
+
     const handleTyping = (value: string) => {
         setInput(value);
         if (!clientRef.current) return;
@@ -162,15 +235,6 @@ export default function Conversation(props: Readonly<PropsT>) {
         }
     };
 
-    const handleAgreedAmount = async () => {
-        // trigger otp
-        const resp = await api.post<{ status: string }>("/chat/api/conversations/send-negotiation-otp");
-        if (resp.status === "OK") {
-            setOtpError("");
-            setShowOtpModal(true);
-        }
-    };
-
     const verifyOtp = async (formData: FormData) => {
         const otp = formData.get("otp");
         const payload = { otp, conversationId, peerId: chattingWith, senderId: currentUser, price: agreeAmount, itemId: vehicleId };
@@ -185,45 +249,6 @@ export default function Conversation(props: Readonly<PropsT>) {
                 setOtpError("Something went wrong. Please try again later.");
             }
         }
-    };
-
-    const getPriceDisplay = () => {
-        if (negotiationInfo?.agreedPriceLocked) {
-            return (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <CheckCircleIcon className="h-5 w-5 text-green-600" />
-                        <span className="text-green-800 font-medium">Agreement Reached!</span>
-                    </div>
-                    <p className="text-green-700 text-sm mb-2">Both parties agreed on USD {negotiationInfo.agreedPrice}</p>
-                    {role?.toLocaleLowerCase() === "buyer" ? <AddToCartButton vehicleId={vehicleId} isNegotiated={true} /> : <Button className="w-full mt-2">View Sale details</Button>}
-                </div>
-            );
-        }
-        if (negotiationInfo?.userPriceLocked)
-            return (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-green-700 text-sm mb-2">You have agreed on USD {negotiationInfo.userPrice}</p>
-                    <p className="text-green-600 text-sm">Waiting for other party to confirm</p>
-                </div>
-            );
-
-        return (
-            <form action={handleAgreedAmount} className="flex gap-2 items-end">
-                <Input
-                    label={`Your Proposed Amount USD`}
-                    name="conversation"
-                    type="number"
-                    placeholder="Auto-calculated"
-                    parentClassName="grow"
-                    value={agreeAmount}
-                    readOnly
-                />
-                <Button disabled={!agreeAmount} type="submit" className="p-3">
-                    Submit
-                </Button>
-            </form>
-        );
     };
 
     useEffect(() => {
@@ -243,34 +268,13 @@ export default function Conversation(props: Readonly<PropsT>) {
     useEffect(() => {
         if (typeof window === "undefined") return;
 
-        const handleProposalSubmitted = (event: Event) => {
-            const customEvent = event as CustomEvent<{
-                discountPercent: number;
-                finalPrice: number;
-                downpaymentPercent: number;
-            }>;
-
-            const { discountPercent, finalPrice, downpaymentPercent } = customEvent.detail;
-
-            // Create system message about the proposal
-            const systemMessage: Message = {
-                senderId: "system",
-                content: `Proposal submitted: ${discountPercent}% discount applied. Final price: $${Math.round(finalPrice).toLocaleString()}. Downpayment: ${downpaymentPercent}%.`,
-                id: `system_${Date.now()}`,
-                conversationId,
-                createdAt: new Date().toISOString(),
-                sentAt: new Date().toISOString(),
-                name: "System",
-                contentType: "info",
-            };
-
-            setMessages((prev) => [...prev, systemMessage]);
-            shouldAutoScrollRef.current = true;
+        const handleProposalSubmitted = () => {
+            loadPersistedProposalMessages();
         };
 
         window.addEventListener("proposalSubmitted", handleProposalSubmitted);
         return () => window.removeEventListener("proposalSubmitted", handleProposalSubmitted);
-    }, [conversationId]);
+    }, [loadPersistedProposalMessages]);
 
     return (
         <section className="border border-stroke-light rounded-lg bg-white overflow-hidden flex flex-col h-full min-h-96">

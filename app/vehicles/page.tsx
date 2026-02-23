@@ -53,8 +53,8 @@ export default async function VehicleListing({ searchParams }: Readonly<PageProp
     querySearchParams.fuelType = querySearchParams.fuelType ?? [];
     querySearchParams.drivetrain = querySearchParams.drivetrain ?? [];
     const newQuery = { ...querySearchParams };
-    newQuery.sortBy = "price";
-    newQuery.sortOrder = "asc";
+    newQuery.sortBy = "year";
+    newQuery.sortOrder = "desc";
 
     const data: Data = {
         content: [],
