@@ -112,7 +112,7 @@ export default function CartList({
     const selectedUnits = selectedItems.reduce((acc, i) => acc + i.quantity, 0);
     const selectedNegotiationsCount = Object.values(selectedNegotiations).filter(Boolean).length;
     const selectedItemCount = selectedItems.length + selectedNegotiationsCount;
-    const fobTotal = selectedItems.reduce((acc, i) => acc + i.quantity * i.price, 0);
+    const regularFobTotal = selectedItems.reduce((acc, i) => acc + i.quantity * i.price, 0);
     const selectedNegotiationOrders = negotiationOrders.filter((o) => selectedNegotiations[o.conversationId]);
     const regularLogisticsFees = selectedItems.reduce((acc, i) => acc + i.quantity * i.logisticPrice, 0);
     const negotiatedLogisticsFees = selectedNegotiationOrders.reduce((acc, order) => {
@@ -137,6 +137,7 @@ export default function CartList({
         (acc, o) => acc + (selectedNegotiations[o.conversationId] ? o.totals?.total ?? 0 : 0),
         0
     );
+    const fobTotal = regularFobTotal + negotiatedTotal;
     const negotiatedUnits = negotiationOrders.reduce(
         (acc, o) =>
             acc +
@@ -145,7 +146,7 @@ export default function CartList({
                 : 0),
         0
     );
-    const tatalPayable = fobTotal + logisticsFees + negotiatedTotal;
+    const tatalPayable = fobTotal + logisticsFees;
 
     const handleSelectAll = async () => {
         try {
